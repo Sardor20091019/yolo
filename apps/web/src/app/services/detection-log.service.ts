@@ -285,3 +285,4 @@ export class DetectionLogService {
     downloadAnchor.remove();
   }
 }
+

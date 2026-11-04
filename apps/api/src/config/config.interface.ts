@@ -28,5 +28,9 @@ export interface AppConfig {
     defaultLoiteringTimeLimit: number;
     defaultNervousCheckLimit: number;
   };
+  google: {
+    clientId: string;
+    clientSecret: string;
+  };
 }
 

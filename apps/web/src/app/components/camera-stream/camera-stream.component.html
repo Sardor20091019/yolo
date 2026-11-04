@@ -1,27 +1,37 @@
 <div
   #cameraContainer
   [ngClass]="isFullscreen() ? 'fixed inset-0 z-50 rounded-none border-0 w-screen h-screen bg-black' : 'relative flex flex-col h-full bg-[#0c0d11] border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl'">
-  
+
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3.5 sm:px-5 py-2.5 sm:py-3 bg-[#101216]/80 border-b border-white/[0.06] backdrop-blur gap-2 z-10">
     <div class="flex items-center justify-between sm:justify-start space-x-2.5">
       <div class="flex items-center space-x-2">
         <div class="relative flex items-center justify-center">
-          <span class="w-2 h-2 rounded-full" [ngClass]="isStreaming() ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'"></span>
-          <span class="absolute w-1.5 h-1.5 rounded-full" [ngClass]="isStreaming() ? 'bg-emerald-400' : 'bg-zinc-500'"></span>
+          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="isStreaming() ? 'bg-rose-500 animate-ping' : 'bg-zinc-600'"></span>
+          <span class="absolute w-2 h-2 rounded-full" [ngClass]="isStreaming() ? 'bg-rose-500' : 'bg-zinc-500'"></span>
         </div>
-        <span class="font-mono text-[11px] font-medium tracking-wider uppercase text-zinc-300">
-          OPTICAL FEED
-        </span>
-        <span *ngIf="isStreaming()" class="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-          LIVE
-        </span>
+        <div class="flex flex-col">
+          <div class="flex items-center space-x-1.5">
+            <span class="font-mono text-[11px] font-bold tracking-wider uppercase text-zinc-200">
+              {{ stationId() }}
+            </span>
+            <span *ngIf="isStreaming()" class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+              ● REC
+            </span>
+            <span *ngIf="!isStreaming()" class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+              STANDBY
+            </span>
+          </div>
+          <span class="text-[9px] font-mono text-zinc-500">
+            PYTHON YOLO HUB
+          </span>
+        </div>
       </div>
 
       <div class="flex items-center space-x-2 font-mono text-[10px] text-zinc-400 bg-black/40 px-2.5 py-1 rounded-lg border border-white/[0.06]">
         <span class="text-zinc-500">FPS</span>
         <span class="text-zinc-200 font-semibold">{{ fps() }}</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-500">SEEN</span>
+        <span class="text-zinc-500">OBJECTS</span>
         <span class="text-emerald-400 font-semibold">
           {{ currentDetectionsCount() }}
         </span>
@@ -108,11 +118,21 @@
 
       <button
         type="button"
-        (click)="toggleStream()"
-        [ngClass]="isStreaming() ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25' : 'bg-white text-zinc-950 hover:bg-zinc-200 border-transparent shadow-sm'"
-        class="px-3.5 py-1 text-xs font-mono font-medium rounded-lg border transition-all text-center">
-        {{ isStreaming() ? 'STOP' : 'START' }}
+        (click)="handleStartClick()"
+        [ngClass]="isStreaming() ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30' : 'bg-rose-600 text-white hover:bg-rose-500 border-transparent shadow-lg font-bold'"
+        class="px-3.5 py-1 text-xs font-mono rounded-lg border transition-all text-center">
+        {{ isStreaming() ? 'DEACTIVATE' : 'ACTIVATE CCTV' }}
       </button>
+    </div>
+  </div>
+
+  <div *ngIf="isStreaming()" class="px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between text-[11px] font-mono text-amber-300 z-10">
+    <div class="flex items-center space-x-2">
+      <span class="animate-pulse">⚠️</span>
+      <span class="font-medium tracking-wide">ACTIVE CCTV OPTICAL SENSOR • STREAMING TO PYTHON YOLO ENGINE</span>
+    </div>
+    <div class="hidden sm:block text-[10px] text-amber-400/80">
+      CENTRAL ARCHIVE LOGGING ACTIVE
     </div>
   </div>
 
@@ -131,13 +151,33 @@
     </div>
 
     <div *ngIf="!isStreaming()" class="absolute inset-0 flex flex-col items-center justify-center bg-[#07080a] text-zinc-500 p-4 text-center z-10">
-      <div class="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-3">
-        <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="w-14 h-14 rounded-2xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-center mb-3 text-rose-500">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
         </svg>
       </div>
-      <span class="font-mono text-xs uppercase tracking-wider text-zinc-300">OPTICAL CAMERA STANDBY</span>
-      <span class="text-[11px] text-zinc-600 mt-1">Tap START to enable camera object detection and logging</span>
+      <span class="font-mono text-sm font-semibold uppercase tracking-wider text-zinc-200">
+        CCTV TERMINAL STANDBY
+      </span>
+      <span class="text-xs text-zinc-400 mt-1 max-w-sm">
+        This device operates as an active optical surveillance node. Tap "ACTIVATE CCTV" to initiate live video transmission to the central Python YOLO engine.
+      </span>
+      <div class="mt-4 flex items-center space-x-2 text-[11px] font-mono text-zinc-500 bg-white/[0.03] px-3 py-1.5 rounded-lg border border-white/[0.06]">
+        <span>NODE IDENTITY:</span>
+        <span class="text-zinc-300 font-semibold">{{ stationId() }}</span>
+      </div>
+    </div>
+
+    <div *ngIf="isStreaming()" class="absolute top-3 left-3 flex flex-col space-y-1 z-20 pointer-events-none font-mono text-[10px]">
+      <div class="flex items-center space-x-2 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-md border border-white/[0.1] text-zinc-200">
+        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+        <span class="font-bold text-rose-400">● REC</span>
+        <span class="text-zinc-500">|</span>
+        <span>{{ currentTimeUtcString }}</span>
+      </div>
+      <div class="bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-zinc-400 text-[9px] border border-white/[0.06]">
+        STATION: {{ stationId() }} &bull; PYTHON YOLO LINK ACTIVE
+      </div>
     </div>
 
     <canvas
@@ -152,15 +192,15 @@
 
     <div
       *ngIf="isStreaming() && detectedObjectChips().length > 0"
-      class="absolute top-3 left-3 right-3 flex flex-wrap gap-1.5 pointer-events-none z-20">
+      class="absolute bottom-4 left-3 right-3 flex flex-wrap gap-1.5 pointer-events-none z-20">
       <div
         *ngFor="let chip of detectedObjectChips()"
-        class="px-2.5 py-1 rounded-lg bg-black/70 border border-emerald-500/30 backdrop-blur-md flex items-center space-x-1.5 shadow-lg">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="font-mono text-[11px] uppercase font-semibold text-zinc-100">
+        class="px-2.5 py-1 rounded-lg bg-black/80 border border-emerald-500/40 backdrop-blur-md flex items-center space-x-1.5 shadow-xl">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="font-mono text-[11px] uppercase font-bold text-zinc-100">
           {{ chip.label }}
         </span>
-        <span class="font-mono text-[10px] text-emerald-400">
+        <span class="font-mono text-[10px] text-emerald-400 font-semibold">
           {{ chip.confidence }}%
         </span>
       </div>
@@ -168,50 +208,77 @@
 
     <div
       *ngIf="isFullscreen()"
-      class="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-auto z-30">
-      <div class="flex items-center space-x-1.5 bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/[0.1]">
-        <button
-          type="button"
-          (click)="setZoom(0.5)"
-          [ngClass]="zoomLevel() <= 0.6 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
-          class="px-2.5 py-1 text-xs font-mono rounded-lg">
-          0.5x
-        </button>
-        <button
-          type="button"
-          (click)="setZoom(1.0)"
-          [ngClass]="zoomLevel() > 0.6 && zoomLevel() < 1.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
-          class="px-2.5 py-1 text-xs font-mono rounded-lg">
-          1x
-        </button>
-        <button
-          type="button"
-          (click)="setZoom(2.0)"
-          [ngClass]="zoomLevel() >= 1.5 && zoomLevel() < 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
-          class="px-2.5 py-1 text-xs font-mono rounded-lg">
-          2x
-        </button>
-        <button
-          type="button"
-          (click)="setZoom(3.0)"
-          [ngClass]="zoomLevel() >= 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
-          class="px-2.5 py-1 text-xs font-mono rounded-lg">
-          3x
-        </button>
+      class="absolute bottom-4 right-4 flex items-center space-x-2 pointer-events-auto z-30">
+      <button
+        type="button"
+        (click)="toggleCameraFacing()"
+        class="px-3 py-1.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/[0.15] text-xs font-mono text-zinc-200">
+        {{ facingMode() === 'environment' ? 'BACK' : 'FRONT' }}
+      </button>
+      <button
+        type="button"
+        (click)="toggleFullscreen()"
+        class="px-3 py-1.5 rounded-xl bg-white text-zinc-950 font-bold text-xs font-mono shadow-lg">
+        EXIT FULL
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="showCctvWarningModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="bg-[#101216] border border-amber-500/30 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl flex flex-col space-y-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl font-bold">
+          ⚠️
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-zinc-100 uppercase tracking-wide">
+            CCTV SURVEILLANCE ACTIVATION ADVISORY
+          </h3>
+          <p class="text-xs font-mono text-zinc-400">
+            Node Station: {{ stationId() }}
+          </p>
+        </div>
       </div>
 
-      <div class="flex items-center space-x-2">
+      <div class="space-y-2.5 text-xs text-zinc-300 bg-black/40 p-4 rounded-xl border border-white/[0.06] font-mono leading-relaxed">
+        <div class="flex items-start space-x-2">
+          <span class="text-amber-400 font-bold">&bull;</span>
+          <span><strong>ACTIVE CCTV TRANSMISSION:</strong> Activating this optical feed converts this device into an active CCTV surveillance sensor.</span>
+        </div>
+        <div class="flex items-start space-x-2">
+          <span class="text-amber-400 font-bold">&bull;</span>
+          <span><strong>PYTHON YOLO ANALYSIS:</strong> Live frames are continuously streamed to the central neural backend for real-time object classification and suspicious posture tracking.</span>
+        </div>
+        <div class="flex items-start space-x-2">
+          <span class="text-amber-400 font-bold">&bull;</span>
+          <span><strong>FORENSIC ARCHIVING:</strong> Surveillance timestamps, identified objects, and incident alerts are logged permanently to the central database.</span>
+        </div>
+      </div>
+
+      <div class="flex items-start space-x-2.5 pt-1">
+        <input
+          type="checkbox"
+          id="consentCheckbox"
+          [(ngModel)]="surveillanceConsentChecked"
+          class="mt-0.5 rounded bg-black/60 border-white/[0.2] text-rose-500 focus:ring-rose-500 cursor-pointer" />
+        <label for="consentCheckbox" class="text-xs text-zinc-300 cursor-pointer select-none">
+          I acknowledge and authorize this device to operate as an active CCTV surveillance optical sensor.
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2.5 pt-2 border-t border-white/[0.06]">
         <button
           type="button"
-          (click)="toggleCameraFacing()"
-          class="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/[0.1] text-xs font-mono text-zinc-200">
-          {{ facingMode() === 'environment' ? 'BACK' : 'FRONT' }}
+          (click)="cancelCctvActivation()"
+          class="px-4 py-2 rounded-xl text-xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
+          ABORT
         </button>
         <button
           type="button"
-          (click)="toggleFullscreen()"
-          class="px-3 py-1.5 rounded-xl bg-white text-zinc-950 font-bold text-xs font-mono shadow-lg">
-          EXIT FULL
+          (click)="confirmAndStartCctv()"
+          [disabled]="!surveillanceConsentChecked"
+          class="px-5 py-2 rounded-xl text-xs font-mono font-bold bg-rose-600 hover:bg-rose-500 disabled:opacity-30 disabled:hover:bg-rose-600 text-white transition-all shadow-lg">
+          ACTIVATE CCTV SENSOR
         </button>
       </div>
     </div>

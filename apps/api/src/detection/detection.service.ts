@@ -114,7 +114,21 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const pythonBin = this.configService.get<string>('python.binPath', 'python3');
+    const venvCandidates = [
+      path.resolve(process.cwd(), '.venv/bin/python'),
+      path.resolve(process.cwd(), '../.venv/bin/python'),
+      path.resolve(process.cwd(), '../../.venv/bin/python'),
+      path.resolve(__dirname, '../../../../.venv/bin/python'),
+      path.resolve(__dirname, '../../../.venv/bin/python'),
+    ];
+    let pythonBin = this.configService.get<string>('python.binPath', 'python3');
+    for (const venvPath of venvCandidates) {
+      if (fs.existsSync(venvPath)) {
+        pythonBin = venvPath;
+        break;
+      }
+    }
+
     const configuredScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
     const workerScript = this.resolveWorkerScriptPath(configuredScript);
     const workerDir = path.dirname(workerScript);
@@ -200,6 +214,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     frameIndex: number,
     source: 'WEBCAM' | 'IP_CAMERA' = 'WEBCAM',
     clientDetectedBoxes?: BoundingBox[],
+    stationId?: string,
+    stationName?: string,
   ): Promise<FrameProcessingResult> {
     const activeZones = await this.detectionRepository.findActiveZones();
     const zones = activeZones.map((z) => ({
@@ -209,28 +225,14 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       dwellLimit: z.dwell_time_threshold,
     }));
 
-    if (clientDetectedBoxes && clientDetectedBoxes.length > 0) {
-      const realResult = this.evaluateRealDetections(
-        frameIndex,
-        clientDetectedBoxes,
-        zones,
-        {
-          confidenceThreshold: this.activeConfig.confidenceThreshold,
-          suspicionThreshold: this.activeConfig.suspicionThreshold,
-          loiteringThresholdSeconds: this.activeConfig.loiteringThresholdSeconds,
-          nervousCheckSensitivity: this.activeConfig.nervousCheckSensitivity,
-        },
-      );
-      await this.evaluateSuspicionAndTriggerAlerts(realResult, frameData);
-      return realResult;
-    }
-
     const requestId = ++this.requestCounter;
     const payload = {
       requestId,
       frameIndex,
       frameData,
       source,
+      stationId: stationId || 'CCTV-MAIN',
+      stationName: stationName || 'CCTV Optical Sensor',
       zones,
       calibration: {
         confidenceThreshold: this.activeConfig.confidenceThreshold,

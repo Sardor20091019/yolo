@@ -30,5 +30,9 @@ export default (): AppConfig => ({
     defaultLoiteringTimeLimit: parseFloat(process.env.DEFAULT_LOITERING_TIME_LIMIT || '10'),
     defaultNervousCheckLimit: parseInt(process.env.DEFAULT_NERVOUS_CHECK_LIMIT || '3', 10),
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  },
 });
 

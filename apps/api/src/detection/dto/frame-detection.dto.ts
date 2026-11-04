@@ -17,6 +17,14 @@ export class FrameDetectionDto {
   @IsOptional()
   source?: 'WEBCAM' | 'IP_CAMERA';
 
+  @IsString()
+  @IsOptional()
+  stationId?: string;
+
+  @IsString()
+  @IsOptional()
+  stationName?: string;
+
   @IsOptional()
   detectedBoxes?: Array<{
     trackId: number;

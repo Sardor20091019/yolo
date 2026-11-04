@@ -45,15 +45,20 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public readonly hardwareZoomSupported: WritableSignal<boolean> = signal<boolean>(false);
   public readonly detectedObjectChips: WritableSignal<{ label: string; confidence: number }[]> = signal([]);
 
+  public readonly stationId: WritableSignal<string> = signal<string>('CCTV-NODE-01');
+  public readonly stationName: WritableSignal<string> = signal<string>('Optical Sensor Station #1');
+  public readonly showCctvWarningModal: WritableSignal<boolean> = signal<boolean>(false);
+  public readonly hasAcknowledgedSurveillanceNotice: WritableSignal<boolean> = signal<boolean>(false);
+  public surveillanceConsentChecked: boolean = false;
+  public currentTimeUtcString: string = '';
+
   public currentDetections: BoundingBox[] = [];
   public availableLenses: CameraLensDevice[] = [];
   public activeDeviceId: string = '';
 
-  private cocoModel: any = null;
-  private isModelLoading: boolean = false;
-  private isDetecting: boolean = false;
   private mediaStream: MediaStream | null = null;
   private captureIntervalId: any = null;
+  private clockIntervalId: any = null;
   private frameCounter: number = 0;
   private lastFpsTimestamp: number = Date.now();
   private framesSinceLastFps: number = 0;
@@ -68,6 +73,19 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const result = this.wsService.latestResult();
       if (result) {
         this.renderHud(result);
+        this.currentDetections = result.boxes || [];
+        this.currentDetectionsCount.set(this.currentDetections.length);
+
+        const chips = this.currentDetections.map((d) => ({
+          label: d.label,
+          confidence: Math.round(d.confidence * 100),
+        }));
+        this.detectedObjectChips.set(chips);
+
+        if (this.currentDetections.length > 0) {
+          this.logService.recordDetections(this.currentDetections);
+        }
+
         const highRisks = result.suspicion.filter((s) => s.score >= 70).length;
         this.threatCount.set(highRisks);
       }
@@ -75,9 +93,40 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public ngOnInit(): void {
+    this.restoreStationIdentity();
     this.enumerateCameraLenses();
-    this.loadObjectDetectionModel();
     this.startRenderLoop();
+    this.startClock();
+  }
+
+  private restoreStationIdentity(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    const savedId = localStorage.getItem('astro_cctv_station_id');
+    const savedName = localStorage.getItem('astro_cctv_station_name');
+    if (savedId) {
+      this.stationId.set(savedId);
+    } else {
+      const genId = 'CCTV-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      this.stationId.set(genId);
+      localStorage.setItem('astro_cctv_station_id', genId);
+    }
+    if (savedName) {
+      this.stationName.set(savedName);
+    }
+  }
+
+  private startClock(): void {
+    this.updateClock();
+    this.clockIntervalId = setInterval(() => {
+      this.updateClock();
+    }, 1000);
+  }
+
+  private updateClock(): void {
+    const d = new Date();
+    this.currentTimeUtcString = d.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
   }
 
   @HostListener('document:fullscreenchange')
@@ -127,37 +176,39 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async loadObjectDetectionModel(): Promise<void> {
-    const w = typeof window !== 'undefined' ? (window as any) : null;
-    if (w && w.cocoSsd) {
-      this.isModelLoading = true;
-      try {
-        this.cocoModel = await w.cocoSsd.load({ base: 'mobilenet_v2' });
-      } catch {
-        try {
-          this.cocoModel = await w.cocoSsd.load();
-        } catch {
-          this.cocoModel = null;
-        }
-      } finally {
-        this.isModelLoading = false;
-      }
-    }
-  }
-
   public ngOnDestroy(): void {
     this.stopStream();
     if (this.renderAnimationId !== null) {
       cancelAnimationFrame(this.renderAnimationId);
     }
+    if (this.clockIntervalId) {
+      clearInterval(this.clockIntervalId);
+    }
   }
 
-  public async toggleStream(): Promise<void> {
+  public async handleStartClick(): Promise<void> {
     if (this.isStreaming()) {
       this.stopStream();
-    } else {
-      await this.startStream();
+      return;
     }
+
+    if (!this.hasAcknowledgedSurveillanceNotice()) {
+      this.surveillanceConsentChecked = false;
+      this.showCctvWarningModal.set(true);
+      return;
+    }
+
+    await this.startStream();
+  }
+
+  public async confirmAndStartCctv(): Promise<void> {
+    this.hasAcknowledgedSurveillanceNotice.set(true);
+    this.showCctvWarningModal.set(false);
+    await this.startStream();
+  }
+
+  public cancelCctvActivation(): void {
+    this.showCctvWarningModal.set(false);
   }
 
   public async startStream(): Promise<void> {
@@ -195,10 +246,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       await this.enumerateCameraLenses();
       this.detectTrackCapabilities();
       await this.applyHardwareZoom(this.zoomLevel());
-
-      if (!this.cocoModel) {
-        await this.loadObjectDetectionModel();
-      }
 
       this.isStreaming.set(true);
       this.startCaptureInterval();
@@ -404,7 +451,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       clearInterval(this.captureIntervalId);
     }
 
-    const intervalMs = Math.round(1000 / 15);
+    const intervalMs = Math.round(1000 / 12);
     this.captureIntervalId = setInterval(() => {
       this.captureAndSendFrame();
     }, intervalMs);
@@ -435,50 +482,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       hiddenCanvas.height = vHeight;
       ctx.drawImage(video, 0, 0, vWidth, vHeight);
       frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
-
-      if (this.cocoModel && !this.isDetecting) {
-        this.isDetecting = true;
-        try {
-          const predictions = await this.cocoModel.detect(video);
-          const scaleX = 1280 / vWidth;
-          const scaleY = 720 / vHeight;
-
-          this.currentDetections = predictions.map((pred: any, idx: number) => {
-            const [bx, by, bw, bh] = pred.bbox;
-            let label = pred.class.toLowerCase();
-            if (label === 'cell phone') label = 'phone';
-            if (label === 'dining table') label = 'desk';
-            if (label === 'couch') label = 'sofa';
-
-            return {
-              trackId: idx + 1,
-              label,
-              confidence: Math.round(pred.score * 100) / 100,
-              bbox: [
-                Math.round(bx * scaleX),
-                Math.round(by * scaleY),
-                Math.round((bx + bw) * scaleX),
-                Math.round((by + bh) * scaleY),
-              ] as [number, number, number, number],
-            };
-          });
-
-          this.currentDetectionsCount.set(this.currentDetections.length);
-
-          const chips = this.currentDetections.map((d) => ({
-            label: d.label,
-            confidence: Math.round(d.confidence * 100),
-          }));
-          this.detectedObjectChips.set(chips);
-
-          if (this.currentDetections.length > 0) {
-            this.logService.recordDetections(this.currentDetections);
-          }
-        } catch {
-        } finally {
-          this.isDetecting = false;
-        }
-      }
     } else {
       hiddenCanvas.width = 640;
       hiddenCanvas.height = 360;
@@ -496,7 +499,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.lastFpsTimestamp = now;
     }
 
-    this.wsService.sendFrame(frameBase64, this.frameCounter, 'WEBCAM', this.currentDetections);
+    this.wsService.sendFrame(
+      frameBase64,
+      this.frameCounter,
+      'WEBCAM',
+      undefined,
+      this.stationId(),
+      this.stationName(),
+    );
   }
 
   private startRenderLoop(): void {
@@ -514,9 +524,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
               backendResult.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
             }
 
-            const boxesToRender = this.currentDetections.length > 0
-              ? this.currentDetections
-              : (backendResult?.boxes || []);
+            const boxesToRender = backendResult?.boxes || this.currentDetections;
 
             this.renderCrosshair(ctx, canvas.width, canvas.height);
             this.renderBoxes(ctx, boxesToRender, suspicionMap);
@@ -627,8 +635,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       const confPct = Math.round((box.confidence || 0.9) * 100);
       const labelText = isPerson
-        ? `PERSON #${box.trackId} ${score}% RISK`
-        : `${box.label.toUpperCase()}  ${confPct}%`;
+        ? `PERSON #${box.trackId} [YOLO] ${score}% RISK`
+        : `[YOLO] ${box.label.toUpperCase()} ${confPct}%`;
 
       ctx.font = '600 11px JetBrains Mono, monospace';
       const textMetrics = ctx.measureText(labelText);

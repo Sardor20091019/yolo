@@ -28,6 +28,8 @@ export class DetectionController {
       frameDto.frameIndex,
       frameDto.source,
       frameDto.detectedBoxes,
+      frameDto.stationId,
+      frameDto.stationName,
     );
   }
 
