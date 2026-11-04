@@ -540,10 +540,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private renderTacticalReticle(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     const cx = width / 2;
     const cy = height / 2;
-    const len = 24;
-    const gap = 8;
+    const len = 20;
+    const gap = 6;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.strokeStyle = 'rgba(210, 205, 195, 0.18)';
     ctx.lineWidth = 1;
 
     ctx.beginPath();
@@ -558,13 +558,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     ctx.lineTo(cx, cy + len);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
-    ctx.strokeRect(cx - 36, cy - 36, 72, 72);
+    ctx.strokeStyle = 'rgba(168, 136, 64, 0.35)';
+    ctx.strokeRect(cx - 30, cy - 30, 60, 60);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.font = '500 9px JetBrains Mono, monospace';
-    ctx.fillText(`FOCAL: ${this.zoomLevel().toFixed(1)}X`, cx + 42, cy - 28);
-    ctx.fillText(`CENTER [${cx}, ${cy}]`, cx + 42, cy - 16);
+    ctx.fillStyle = 'rgba(210, 205, 195, 0.4)';
+    ctx.font = '500 9px "IBM Plex Mono", monospace';
+    ctx.fillText(`FOCAL: ${this.zoomLevel().toFixed(1)}X`, cx + 36, cy - 20);
+    ctx.fillText(`CTR: [${Math.round(cx)}, ${Math.round(cy)}]`, cx + 36, cy - 8);
   }
 
   private renderHud(result: FrameResult): void {
@@ -602,27 +602,27 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const score = sus ? sus.score : 0;
       const isPerson = box.label.toLowerCase() === 'person';
 
-      let strokeColor = isPerson ? 'rgba(255, 255, 255, 0.7)' : 'rgba(16, 185, 129, 0.95)';
-      let badgeBg = 'rgba(7, 9, 13, 0.94)';
-      let textColor = isPerson ? '#f4f4f6' : '#10b981';
+      let strokeColor = isPerson ? 'rgba(208, 205, 196, 0.65)' : '#3d6b54';
+      let badgeBg = '#0b0b09';
+      let textColor = isPerson ? '#d0cdc4' : '#3d6b54';
 
       if (score >= 75) {
-        strokeColor = '#f43f5e';
-        textColor = '#f43f5e';
+        strokeColor = '#7a4242';
+        textColor = '#7a4242';
       } else if (score >= 40) {
-        strokeColor = '#f59e0b';
-        textColor = '#f59e0b';
+        strokeColor = '#a88840';
+        textColor = '#a88840';
       }
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = score >= 75 ? 2.5 : 1.5;
+      ctx.lineWidth = score >= 75 ? 2 : 1;
       ctx.strokeRect(x1, y1, w, h);
 
-      ctx.fillStyle = score >= 75 ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.04)';
+      ctx.fillStyle = score >= 75 ? 'rgba(122, 66, 66, 0.08)' : (isPerson ? 'rgba(208, 205, 196, 0.03)' : 'rgba(61, 107, 84, 0.04)');
       ctx.fillRect(x1, y1, w, h);
 
-      const corner = Math.min(16, Math.floor(w / 3), Math.floor(h / 3));
-      ctx.lineWidth = 3;
+      const corner = Math.min(12, Math.floor(w / 4), Math.floor(h / 4));
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x1, y1 + corner);
       ctx.lineTo(x1, y1);
@@ -643,13 +643,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       const confPct = Math.round((box.confidence || 0.92) * 100);
       const labelText = isPerson
-        ? `PERSON #${box.trackId} [YOLO-POSE] ${score}% RISK`
+        ? `TRK #${box.trackId} [PERSON] ${score}% RISK`
         : `[YOLO] ${box.label.toUpperCase()} ${confPct}%`;
 
-      ctx.font = '700 11px JetBrains Mono, monospace';
+      ctx.font = '500 10px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
-      const badgeH = 24;
-      const badgeW = Math.max(textMetrics.width + 18, Math.min(w, 280));
+      const badgeH = 20;
+      const badgeW = Math.max(textMetrics.width + 14, Math.min(w, 240));
 
       ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
@@ -659,13 +659,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
       ctx.fillStyle = textColor;
-      ctx.fillText(labelText, x1 + 8, Math.max(16, y1 - 8));
+      ctx.fillText(labelText, x1 + 6, Math.max(14, y1 - 6));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {
-          const trigY = y2 + 16 + idx * 16;
-          ctx.fillStyle = 'rgba(244, 63, 94, 0.95)';
-          ctx.font = '600 10px JetBrains Mono, monospace';
+          const trigY = y2 + 14 + idx * 14;
+          ctx.fillStyle = '#7a4242';
+          ctx.font = '500 9px "IBM Plex Mono", monospace';
           ctx.fillText(`! ${trig}`, x1, trigY);
         });
       }
@@ -684,8 +684,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             ctx.beginPath();
             ctx.moveTo(kp1.x, kp1.y);
             ctx.lineTo(kp2.x, kp2.y);
-            ctx.strokeStyle = 'rgba(244, 63, 94, 0.6)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(168, 136, 64, 0.45)';
+            ctx.lineWidth = 1;
             ctx.stroke();
           }
         }
@@ -694,8 +694,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       kps.forEach((kp) => {
         if (kp.confidence > 0.35) {
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 3, 0, Math.PI * 2);
-          ctx.fillStyle = kp.name.includes('wrist') ? '#f43f5e' : 'rgba(255, 255, 255, 0.9)';
+          ctx.arc(kp.x, kp.y, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = kp.name.includes('wrist') ? '#a88840' : 'rgba(208, 205, 196, 0.85)';
           ctx.fill();
         }
       });
