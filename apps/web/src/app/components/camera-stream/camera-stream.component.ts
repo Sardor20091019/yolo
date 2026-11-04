@@ -282,16 +282,16 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         }
         ctx.closePath();
 
-        ctx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = '#00f0ff';
-        ctx.font = '11px JetBrains Mono';
+        ctx.fillStyle = 'rgba(244, 244, 246, 0.7)';
+        ctx.font = '10px JetBrains Mono';
         ctx.fillText(`ZONE: ${zone.name}`, polygon[0][0] + 6, polygon[0][1] + 16);
       } catch (e) {
         return;
@@ -309,14 +309,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.lineTo(points[i][0], points[i][1]);
     }
 
-    ctx.strokeStyle = '#ffb800';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
     points.forEach(([px, py]) => {
       ctx.beginPath();
-      ctx.arc(px, py, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffb800';
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
       ctx.fill();
     });
   }
@@ -333,19 +333,20 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const sus = suspicionMap.get(box.trackId);
       const score = sus ? sus.score : 0;
 
-      let color = '#00e599';
+      let color = 'rgba(255, 255, 255, 0.4)';
+      let badgeBg = 'rgba(12, 14, 18, 0.9)';
       if (score >= 75) {
-        color = '#ff2a5f';
+        color = '#f43f5e';
       } else if (score >= 40) {
-        color = '#ffb800';
+        color = '#f59e0b';
       }
 
       ctx.strokeStyle = color;
-      ctx.lineWidth = score >= 75 ? 2.5 : 1.8;
+      ctx.lineWidth = score >= 75 ? 2 : 1.2;
       ctx.strokeRect(x1, y1, w, h);
 
-      const cornerLen = 12;
-      ctx.lineWidth = 3.5;
+      const cornerLen = 10;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(x1, y1 + cornerLen);
       ctx.lineTo(x1, y1);
@@ -364,20 +365,24 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.lineTo(x2, y2 - cornerLen);
       ctx.stroke();
 
-      const badgeH = 22;
-      const badgeW = Math.max(130, w);
-      ctx.fillStyle = 'rgba(10, 13, 20, 0.85)';
+      const badgeH = 20;
+      const badgeW = Math.max(120, Math.min(w, 200));
+      ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-      ctx.fillStyle = color;
-      ctx.font = 'bold 11px JetBrains Mono';
-      ctx.fillText(`ID:${box.trackId} ${box.label.toUpperCase()} ${score}%`, x1 + 4, Math.max(14, y1 - 6));
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
+
+      ctx.fillStyle = score >= 75 ? '#f43f5e' : (score >= 40 ? '#f59e0b' : '#f4f4f6');
+      ctx.font = '500 10px JetBrains Mono';
+      ctx.fillText(`ID:${box.trackId} ${box.label.toUpperCase()} ${score}%`, x1 + 6, Math.max(13, y1 - 6));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {
-          const trigY = y2 + 16 + idx * 16;
-          ctx.fillStyle = 'rgba(255, 42, 95, 0.9)';
-          ctx.font = 'bold 10px JetBrains Mono';
+          const trigY = y2 + 14 + idx * 14;
+          ctx.fillStyle = 'rgba(244, 63, 94, 0.9)';
+          ctx.font = '500 9px JetBrains Mono';
           ctx.fillText(`! ${trig}`, x1, trigY);
         });
       }
@@ -396,8 +401,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             ctx.beginPath();
             ctx.moveTo(kp1.x, kp1.y);
             ctx.lineTo(kp2.x, kp2.y);
-            ctx.strokeStyle = 'rgba(0, 240, 255, 0.65)';
-            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.lineWidth = 1.2;
             ctx.stroke();
           }
         }
@@ -406,8 +411,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       kps.forEach((kp) => {
         if (kp.confidence > 0.35) {
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 3, 0, Math.PI * 2);
-          ctx.fillStyle = kp.name.includes('wrist') ? '#ff2a5f' : '#00f0ff';
+          ctx.arc(kp.x, kp.y, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = kp.name.includes('wrist') ? '#f43f5e' : 'rgba(255, 255, 255, 0.85)';
           ctx.fill();
         }
       });

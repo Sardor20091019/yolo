@@ -1,124 +1,126 @@
-<div class="flex flex-col h-full bg-[#111726] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
-  <div class="px-4 py-3 bg-[#0a0d14]/80 border-b border-[#1f293d] flex items-center justify-between">
-    <div class="flex items-center space-x-2">
-      <span class="w-2 h-2 rounded-full bg-[#ff2a5f] animate-ping"></span>
-      <h2 class="font-mono text-xs font-bold tracking-wider uppercase text-slate-200">
-        INCIDENT LOGS & AUDIT
+<div class="flex flex-col h-full bg-[#0c0d11] border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl">
+  <div class="px-5 py-3.5 bg-[#101216]/60 border-b border-white/[0.06] backdrop-blur flex items-center justify-between">
+    <div class="flex items-center space-x-2.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+      <h2 class="font-mono text-xs font-semibold tracking-wider uppercase text-zinc-200">
+        INCIDENT FEED
       </h2>
     </div>
-    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#ff2a5f]/20 text-[#ff2a5f] border border-[#ff2a5f]/40">
+    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20">
       {{ alertsService.metrics().highRiskCount }} CRITICAL
     </span>
   </div>
 
-  <div class="grid grid-cols-3 gap-2 p-3 bg-[#0d121d] border-b border-[#1f293d] text-center font-mono">
-    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
-      <div class="text-[10px] text-slate-500 uppercase">TOTAL</div>
-      <div class="text-sm font-bold text-slate-200">{{ alertsService.metrics().total }}</div>
+  <div class="grid grid-cols-3 gap-2 p-3 bg-[#08090b] border-b border-white/[0.06] text-center font-mono">
+    <div class="bg-[#0e1014] p-2.5 rounded-xl border border-white/[0.05]">
+      <div class="text-[10px] text-zinc-500 uppercase tracking-wide">TOTAL</div>
+      <div class="text-sm font-semibold text-zinc-200 mt-0.5">{{ alertsService.metrics().total }}</div>
     </div>
-    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
-      <div class="text-[10px] text-slate-500 uppercase">UNREVIEWED</div>
-      <div class="text-sm font-bold text-[#ffb800]">{{ alertsService.metrics().newCount }}</div>
+    <div class="bg-[#0e1014] p-2.5 rounded-xl border border-white/[0.05]">
+      <div class="text-[10px] text-zinc-500 uppercase tracking-wide">PENDING</div>
+      <div class="text-sm font-semibold text-amber-300 mt-0.5">{{ alertsService.metrics().newCount }}</div>
     </div>
-    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
-      <div class="text-[10px] text-slate-500 uppercase">CONFIRMED</div>
-      <div class="text-sm font-bold text-[#ff2a5f]">{{ alertsService.metrics().confirmedCount }}</div>
+    <div class="bg-[#0e1014] p-2.5 rounded-xl border border-white/[0.05]">
+      <div class="text-[10px] text-zinc-500 uppercase tracking-wide">FLAGGED</div>
+      <div class="text-sm font-semibold text-rose-400 mt-0.5">{{ alertsService.metrics().confirmedCount }}</div>
     </div>
   </div>
 
-  <div class="flex border-b border-[#1f293d] bg-[#0a0d14] p-1 text-xs font-mono">
+  <div class="flex border-b border-white/[0.06] bg-black/20 p-1.5 text-xs font-mono">
     <button
       *ngFor="let tab of ['ALL', 'NEW', 'CONFIRMED', 'DISMISSED']"
       type="button"
       (click)="setFilter(tab)"
-      [ngClass]="activeFilter() === tab ? 'bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/40' : 'text-slate-400 hover:text-slate-200'"
-      class="flex-1 py-1 text-center rounded transition text-[11px]">
+      [ngClass]="activeFilter() === tab ? 'bg-white/[0.08] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+      class="flex-1 py-1 text-center rounded-lg transition-all text-[11px]">
       {{ tab }}
     </button>
   </div>
 
-  <div class="flex-1 overflow-y-auto p-3 space-y-3">
-    <div *ngIf="alertsService.alerts().length === 0" class="h-48 flex flex-col items-center justify-center text-slate-600 font-mono text-xs">
-      <svg class="w-8 h-8 mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-      <span>NO INCIDENTS RECORDED</span>
+  <div class="flex-1 overflow-y-auto p-3 space-y-2.5">
+    <div *ngIf="alertsService.alerts().length === 0" class="h-48 flex flex-col items-center justify-center text-zinc-600 font-mono text-xs">
+      <div class="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-2.5">
+        <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </div>
+      <span class="text-zinc-500 text-[11px]">NO INCIDENTS RECORDED</span>
     </div>
 
     <div
       *ngFor="let alert of alertsService.alerts()"
-      class="bg-[#0a0d14] border border-[#1f293d] rounded-lg overflow-hidden transition hover:border-[#ff2a5f]/50">
+      class="bg-[#0e1014] border border-white/[0.06] hover:border-white/[0.12] rounded-xl overflow-hidden transition-all shadow-sm">
       
       <div class="p-3">
         <div class="flex items-start justify-between mb-2">
           <div class="flex items-center space-x-2">
             <span
-              [ngClass]="alert.suspicion_score >= 75 ? 'bg-[#ff2a5f]/20 text-[#ff2a5f] border-[#ff2a5f]/40' : 'bg-[#ffb800]/20 text-[#ffb800] border-[#ffb800]/40'"
-              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border">
+              [ngClass]="alert.suspicion_score >= 75 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'"
+              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border">
               {{ alert.suspicion_score }}% RISK
             </span>
-            <span class="font-mono text-xs font-bold text-slate-200">TRACK #{{ alert.track_id }}</span>
+            <span class="font-mono text-xs font-semibold text-zinc-200">ID #{{ alert.track_id }}</span>
           </div>
-          <span class="font-mono text-[10px] text-slate-500">{{ formatTime(alert.created_at) }}</span>
+          <span class="font-mono text-[10px] text-zinc-500">{{ formatTime(alert.created_at) }}</span>
         </div>
 
-        <div class="text-xs font-mono font-semibold text-slate-300 mb-1.5">
+        <div class="text-xs font-mono font-medium text-zinc-300 mb-1.5">
           {{ alert.type.replace('_', ' ') }}
         </div>
 
-        <div *ngIf="parseDetails(alert.details) as d" class="space-y-1 mb-2">
-          <div *ngFor="let trig of d.triggers" class="text-[11px] font-mono text-[#ff2a5f] flex items-center space-x-1">
-            <span>&bull;</span>
+        <div *ngIf="parseDetails(alert.details) as d" class="space-y-1 mb-2.5">
+          <div *ngFor="let trig of d.triggers" class="text-[11px] font-mono text-rose-300/80 flex items-center space-x-1.5">
+            <span class="w-1 h-1 rounded-full bg-rose-400"></span>
             <span>{{ trig }}</span>
           </div>
         </div>
 
-        <div *ngIf="alert.snapshot_url" class="relative group cursor-pointer mb-2 rounded overflow-hidden border border-[#1f293d]" (click)="openModal(alert)">
+        <div *ngIf="alert.snapshot_url" class="relative group cursor-pointer mb-2.5 rounded-lg overflow-hidden border border-white/[0.06]" (click)="openModal(alert)">
           <img
             [src]="getSnapshotUrl(alert.snapshot_url)"
             alt="Incident Snapshot"
-            class="w-full h-24 object-cover group-hover:scale-105 transition" />
-          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs font-mono text-white">
-            CLICK TO INSPECT
+            class="w-full h-24 object-cover group-hover:scale-102 transition-transform duration-300" />
+          <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[11px] font-mono text-zinc-200 backdrop-blur-xs">
+            INSPECT SNAPSHOT
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-[#1f293d]/60 font-mono text-[10px]">
-          <div class="flex items-center space-x-1">
-            <span class="text-slate-500">STATUS:</span>
+        <div class="flex items-center justify-between pt-2.5 border-t border-white/[0.05] font-mono text-[10px]">
+          <div class="flex items-center space-x-1.5">
+            <span class="text-zinc-500">STATE:</span>
             <span
               [ngClass]="{
-                'text-[#ffb800]': alert.status === 'NEW',
-                'text-[#00e599]': alert.status === 'REVIEWED',
-                'text-[#ff2a5f]': alert.status === 'CONFIRMED',
-                'text-slate-500': alert.status === 'DISMISSED'
+                'text-amber-400': alert.status === 'NEW',
+                'text-emerald-400': alert.status === 'REVIEWED',
+                'text-rose-400': alert.status === 'CONFIRMED',
+                'text-zinc-500': alert.status === 'DISMISSED'
               }"
-              class="font-bold">
+              class="font-medium">
               {{ alert.status }}
             </span>
           </div>
 
-          <div class="flex items-center space-x-1">
+          <div class="flex items-center space-x-1.5">
             <button
               *ngIf="alert.status === 'NEW'"
               type="button"
               (click)="updateStatus(alert, 'CONFIRMED')"
-              class="px-2 py-0.5 rounded bg-[#ff2a5f]/20 text-[#ff2a5f] hover:bg-[#ff2a5f]/30 border border-[#ff2a5f]/40">
+              class="px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30 transition-colors">
               CONFIRM
             </button>
             <button
               *ngIf="alert.status === 'NEW'"
               type="button"
               (click)="updateStatus(alert, 'DISMISSED')"
-              class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
+              class="px-2 py-0.5 rounded-md bg-white/[0.05] text-zinc-400 hover:text-zinc-200 transition-colors">
               DISMISS
             </button>
             <button
               type="button"
               (click)="deleteAlert(alert)"
-              class="p-0.5 text-slate-600 hover:text-[#ff2a5f]">
+              class="p-1 text-zinc-600 hover:text-rose-400 transition-colors">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
               </svg>
             </button>
           </div>
@@ -129,43 +131,43 @@
 
   <div
     *ngIf="selectedModalAlert() as modalAlert"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-[#111726] border border-[#1f293d] rounded-xl max-w-2xl w-full p-4 overflow-hidden shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-[#1f293d] mb-4">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#0e1014] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-5 overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between pb-3.5 border-b border-white/[0.08] mb-4">
         <div>
-          <span class="font-mono text-xs text-[#00f0ff] uppercase tracking-wider">INCIDENT SNAPSHOT AUDIT</span>
-          <h3 class="text-sm font-bold font-mono text-slate-100">
-            TRACK ID #{{ modalAlert.track_id }} - {{ modalAlert.suspicion_score }}% RISK
+          <span class="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">INCIDENT AUDIT DETAIL</span>
+          <h3 class="text-sm font-semibold font-mono text-zinc-100 mt-0.5">
+            TRACK ID #{{ modalAlert.track_id }} &bull; {{ modalAlert.suspicion_score }}% RISK
           </h3>
         </div>
         <button
           type="button"
           (click)="closeModal()"
-          class="text-slate-400 hover:text-white font-mono text-sm px-2 py-1">
-          &times; CLOSE
+          class="text-zinc-400 hover:text-white font-mono text-xs px-2.5 py-1 rounded-lg bg-white/[0.04] transition-colors">
+          ESC / CLOSE
         </button>
       </div>
 
-      <div class="relative bg-black rounded-lg overflow-hidden border border-[#1f293d] mb-4 flex items-center justify-center max-h-[480px]">
+      <div class="relative bg-black/50 rounded-xl overflow-hidden border border-white/[0.08] mb-4 flex items-center justify-center max-h-[460px]">
         <img
           [src]="getSnapshotUrl(modalAlert.snapshot_url)"
-          alt="High Resolution Incident Snapshot"
-          class="w-full h-auto object-contain max-h-[480px]" />
+          alt="Incident Snapshot Detail"
+          class="w-full h-auto object-contain max-h-[460px]" />
       </div>
 
-      <div class="flex items-center justify-between font-mono text-xs">
-        <span class="text-slate-500">TIMESTAMP: {{ modalAlert.created_at }}</span>
+      <div class="flex items-center justify-between font-mono text-xs pt-1">
+        <span class="text-zinc-500 text-[11px]">CAPTURED: {{ modalAlert.created_at }}</span>
         <div class="flex space-x-2">
           <button
             type="button"
             (click)="updateStatus(modalAlert, 'CONFIRMED'); closeModal()"
-            class="px-3 py-1 bg-[#ff2a5f] text-white font-bold rounded">
+            class="px-3 py-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 font-medium rounded-lg transition-colors">
             CONFIRM THEFT
           </button>
           <button
             type="button"
             (click)="updateStatus(modalAlert, 'DISMISSED'); closeModal()"
-            class="px-3 py-1 bg-slate-800 text-slate-300 rounded">
+            class="px-3 py-1.5 bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1] rounded-lg transition-colors">
             DISMISS
           </button>
         </div>
@@ -173,4 +175,3 @@
     </div>
   </div>
 </div>
-

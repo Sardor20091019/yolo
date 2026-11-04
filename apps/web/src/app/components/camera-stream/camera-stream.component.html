@@ -1,67 +1,67 @@
-<div class="flex flex-col h-full bg-[#111726] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
-  <div class="flex items-center justify-between px-4 py-3 bg-[#0a0d14]/80 border-b border-[#1f293d]">
+<div class="flex flex-col h-full bg-[#0c0d11] border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl">
+  <div class="flex items-center justify-between px-5 py-3.5 bg-[#101216]/60 border-b border-white/[0.06] backdrop-blur">
     <div class="flex items-center space-x-3">
       <div class="relative flex items-center justify-center">
-        <span class="w-2.5 h-2.5 rounded-full" [ngClass]="isStreaming() ? 'bg-[#00e599] animate-ping' : 'bg-slate-600'"></span>
-        <span class="absolute w-2 h-2 rounded-full" [ngClass]="isStreaming() ? 'bg-[#00e599]' : 'bg-slate-500'"></span>
+        <span class="w-2 h-2 rounded-full" [ngClass]="isStreaming() ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'"></span>
+        <span class="absolute w-1.5 h-1.5 rounded-full" [ngClass]="isStreaming() ? 'bg-emerald-400' : 'bg-zinc-500'"></span>
       </div>
-      <span class="font-mono text-xs font-semibold tracking-wider uppercase text-slate-200">
-        FEED: {{ mode() === 'WEBCAM' ? 'LOCAL SENSOR [A]' : 'IP CCTV NETWORK [B]' }}
+      <span class="font-mono text-[11px] font-medium tracking-wider uppercase text-zinc-300">
+        {{ mode() === 'WEBCAM' ? 'SENSOR A / OPTICAL' : 'SENSOR B / IP NETWORK' }}
       </span>
-      <span *ngIf="isStreaming()" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#ff2a5f]/20 text-[#ff2a5f] border border-[#ff2a5f]/40">
-        AI ACTIVE
+      <span *ngIf="isStreaming()" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20">
+        ANALYZING
       </span>
     </div>
 
     <div class="flex items-center space-x-3">
-      <div class="flex items-center space-x-2 font-mono text-xs text-slate-400 bg-[#0a0d14] px-2.5 py-1 rounded border border-[#1f293d]">
-        <span class="text-slate-500">FPS:</span>
-        <span class="text-[#00f0ff] font-bold">{{ fps() }}</span>
-        <span class="text-slate-600">|</span>
-        <span class="text-slate-500">THREATS:</span>
-        <span [ngClass]="threatCount() > 0 ? 'text-[#ff2a5f] font-bold animate-pulse' : 'text-[#00e599] font-bold'">
+      <div class="flex items-center space-x-2 font-mono text-[11px] text-zinc-400 bg-black/40 px-3 py-1 rounded-lg border border-white/[0.06]">
+        <span class="text-zinc-500">FPS</span>
+        <span class="text-zinc-200 font-semibold">{{ fps() }}</span>
+        <span class="text-zinc-700">/</span>
+        <span class="text-zinc-500">THREATS</span>
+        <span [ngClass]="threatCount() > 0 ? 'text-rose-400 font-semibold' : 'text-zinc-300 font-medium'">
           {{ threatCount() }}
         </span>
       </div>
 
-      <div class="flex rounded-lg bg-[#0a0d14] p-0.5 border border-[#1f293d]">
+      <div class="flex rounded-lg bg-black/40 p-0.5 border border-white/[0.06]">
         <button
           type="button"
           (click)="setMode('WEBCAM')"
-          [ngClass]="mode() === 'WEBCAM' ? 'bg-[#00f0ff]/10 text-[#00f0ff] border border-[#00f0ff]/30' : 'text-slate-400 hover:text-slate-200'"
-          class="px-2.5 py-1 text-xs font-mono font-medium rounded transition">
-          MODE A (WEBCAM)
+          [ngClass]="mode() === 'WEBCAM' ? 'bg-white/[0.08] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+          class="px-2.5 py-1 text-[11px] font-mono rounded-md transition-all">
+          MODE A (CAM)
         </button>
         <button
           type="button"
           (click)="setMode('IP_CAMERA')"
-          [ngClass]="mode() === 'IP_CAMERA' ? 'bg-[#00f0ff]/10 text-[#00f0ff] border border-[#00f0ff]/30' : 'text-slate-400 hover:text-slate-200'"
-          class="px-2.5 py-1 text-xs font-mono font-medium rounded transition">
-          MODE B (IP STREAM)
+          [ngClass]="mode() === 'IP_CAMERA' ? 'bg-white/[0.08] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+          class="px-2.5 py-1 text-[11px] font-mono rounded-md transition-all">
+          MODE B (IP)
         </button>
       </div>
 
       <button
         type="button"
         (click)="toggleStream()"
-        [ngClass]="isStreaming() ? 'bg-[#ff2a5f]/20 text-[#ff2a5f] border-[#ff2a5f]/50 hover:bg-[#ff2a5f]/30' : 'bg-[#00e599]/20 text-[#00e599] border-[#00e599]/50 hover:bg-[#00e599]/30'"
-        class="px-3 py-1 text-xs font-mono font-bold uppercase rounded border transition">
-        {{ isStreaming() ? 'DISENGAGE' : 'ENGAGE CAMERA' }}
+        [ngClass]="isStreaming() ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25' : 'bg-white text-zinc-900 hover:bg-zinc-200 border-transparent shadow-sm'"
+        class="px-3.5 py-1.5 text-xs font-mono font-medium rounded-lg border transition-all">
+        {{ isStreaming() ? 'DISENGAGE' : 'ENGAGE SENSOR' }}
       </button>
     </div>
   </div>
 
-  <div *ngIf="mode() === 'IP_CAMERA'" class="flex items-center space-x-2 px-4 py-2 bg-[#0d121d] border-b border-[#1f293d]">
-    <span class="text-xs font-mono text-slate-400">RTSP/HTTP URL:</span>
+  <div *ngIf="mode() === 'IP_CAMERA'" class="flex items-center space-x-3 px-5 py-2.5 bg-[#090a0d] border-b border-white/[0.06]">
+    <span class="text-xs font-mono text-zinc-400">FEED URL:</span>
     <input
       type="text"
       [ngModel]="ipStreamUrl()"
       (ngModelChange)="ipStreamUrl.set($event)"
       placeholder="http://192.168.1.100:8080/video"
-      class="flex-1 bg-[#0a0d14] border border-[#1f293d] rounded px-2.5 py-1 text-xs font-mono text-slate-100 focus:outline-none focus:border-[#00f0ff]" />
+      class="flex-1 bg-black/40 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30 transition-colors" />
   </div>
 
-  <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[420px]">
+  <div class="relative flex-1 bg-[#060709] flex items-center justify-center overflow-hidden min-h-[420px]">
     <video
       #videoElement
       autoplay
@@ -71,19 +71,21 @@
       [ngClass]="mode() === 'WEBCAM' ? 'block' : 'hidden'">
     </video>
 
-    <div *ngIf="mode() === 'IP_CAMERA' && isStreaming()" class="w-full h-full flex items-center justify-center bg-[#070a0f]">
-      <div class="text-center font-mono text-xs text-slate-500">
-        <div class="animate-pulse text-[#00f0ff] mb-2 font-bold">[ STREAMING FROM IP SURVEILLANCE FEED ]</div>
-        <div>{{ ipStreamUrl() || 'Emulating RTSP Video Stream' }}</div>
+    <div *ngIf="mode() === 'IP_CAMERA' && isStreaming()" class="w-full h-full flex items-center justify-center bg-[#07080a]">
+      <div class="text-center font-mono text-xs text-zinc-500">
+        <div class="text-zinc-300 mb-2 font-medium">[ STREAMING IP FEED ]</div>
+        <div class="text-zinc-600">{{ ipStreamUrl() || 'Emulating RTSP Video Stream' }}</div>
       </div>
     </div>
 
-    <div *ngIf="!isStreaming()" class="absolute inset-0 flex flex-col items-center justify-center bg-[#070a0f] text-slate-500">
-      <svg class="w-12 h-12 mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-      </svg>
-      <span class="font-mono text-sm uppercase tracking-wider text-slate-400">SENSOR FEED STANDBY</span>
-      <span class="text-xs text-slate-600 mt-1">Press "ENGAGE CAMERA" to start real-time inference</span>
+    <div *ngIf="!isStreaming()" class="absolute inset-0 flex flex-col items-center justify-center bg-[#07080a] text-zinc-500">
+      <div class="w-12 h-12 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center mb-3">
+        <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <span class="font-mono text-xs uppercase tracking-wider text-zinc-400">SENSOR FEED STANDBY</span>
+      <span class="text-[11px] text-zinc-600 mt-1">Initiate camera feed to run YOLO pose heuristics</span>
     </div>
 
     <canvas
@@ -96,40 +98,39 @@
 
     <canvas #hiddenCanvas class="hidden"></canvas>
 
-    <div class="absolute bottom-3 left-3 flex items-center space-x-2">
+    <div class="absolute bottom-4 left-4 flex items-center space-x-2.5">
       <button
         type="button"
         (click)="toggleDrawZone()"
-        [ngClass]="isDrawingZone() ? 'bg-[#ffb800] text-black font-bold' : 'bg-[#0a0d14]/80 text-[#00f0ff] border border-[#00f0ff]/40 hover:bg-[#00f0ff]/20'"
-        class="px-2.5 py-1 text-[11px] font-mono rounded backdrop-blur transition">
-        {{ isDrawingZone() ? 'FINISH DRAWING' : '+ DEFINE SHELF ROI' }}
+        [ngClass]="isDrawingZone() ? 'bg-amber-400 text-zinc-950 font-semibold' : 'bg-black/60 hover:bg-black/80 text-zinc-300 border border-white/[0.1]'"
+        class="px-3 py-1.5 text-[11px] font-mono rounded-lg backdrop-blur-md transition-all shadow-lg">
+        {{ isDrawingZone() ? 'COMPLETE ZONE' : '+ DEFINE SHELF ROI' }}
       </button>
 
-      <div *ngIf="isDrawingZone()" class="flex items-center space-x-2 bg-[#0a0d14]/90 p-1.5 rounded border border-[#ffb800]/50 backdrop-blur">
+      <div *ngIf="isDrawingZone()" class="flex items-center space-x-2 bg-[#0e1014]/90 p-1.5 rounded-xl border border-white/[0.1] backdrop-blur-md shadow-2xl">
         <input
           type="text"
           [(ngModel)]="newZoneName"
           placeholder="Zone name"
-          class="bg-[#111726] border border-[#1f293d] rounded px-2 py-0.5 text-[11px] font-mono text-white w-32 focus:outline-none" />
+          class="bg-black/50 border border-white/[0.08] rounded-lg px-2.5 py-1 text-[11px] font-mono text-zinc-200 w-32 focus:outline-none focus:border-white/30" />
         <input
           type="number"
           [(ngModel)]="newZoneDwell"
           placeholder="Dwell (s)"
-          class="bg-[#111726] border border-[#1f293d] rounded px-2 py-0.5 text-[11px] font-mono text-white w-16 focus:outline-none" />
+          class="bg-black/50 border border-white/[0.08] rounded-lg px-2.5 py-1 text-[11px] font-mono text-zinc-200 w-20 focus:outline-none focus:border-white/30" />
         <button
           type="button"
           (click)="saveDrawnZone()"
-          class="bg-[#00e599] text-black font-bold px-2 py-0.5 rounded text-[11px] font-mono hover:bg-[#00e599]/90">
+          class="bg-white text-zinc-950 font-medium px-2.5 py-1 rounded-md text-[11px] font-mono hover:bg-zinc-200 transition-colors">
           SAVE
         </button>
         <button
           type="button"
           (click)="cancelDrawZone()"
-          class="bg-[#ff2a5f]/20 text-[#ff2a5f] px-2 py-0.5 rounded text-[11px] font-mono hover:bg-[#ff2a5f]/30">
+          class="bg-white/[0.05] text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded-md text-[11px] font-mono transition-colors">
           CANCEL
         </button>
       </div>
     </div>
   </div>
 </div>
-
