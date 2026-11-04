@@ -1,87 +1,100 @@
 <div class="min-h-screen bg-obs-bg flex flex-col font-sans" style="color:#d0cdc4">
 
-  <div class="border-b hairline px-6 py-2 flex items-center justify-between" style="background:#111110">
+  <div class="border-b hairline px-4 sm:px-6 py-1.5 flex items-center justify-between" style="background:#0e0e0c">
     <div class="flex items-center space-x-3">
-      <span class="status-dot animate-live" style="background:#3d6b54"></span>
-      <span class="label" style="color:#3d6b54">SURVEILLANCE SYSTEM ACTIVE</span>
+      <div class="flex items-center space-x-2">
+        <span class="status-dot animate-live" style="background:#3d6b54"></span>
+        <span class="label" style="color:#3d6b54">PROTOCOL ACTIVE // SECTOR-01</span>
+      </div>
+      <span class="hairline hidden md:inline-block" style="border-left:1px solid; height:0.65rem"></span>
+      <span class="label hidden md:inline-block">CENTRAL YOLO11 NEURAL PIPELINE &bull; ALL CAMERAS ROUTED TO CENTRAL MULTIPLEX</span>
     </div>
-    <span class="label hidden sm:block">CENTRAL YOLO INFERENCE ENGINE &bull; ALL CAMERAS TRANSMIT TO COMMAND NODE</span>
-    <div class="flex items-center space-x-2">
-      <span class="status-dot" [style.background]="wsService.isConnected() ? '#3d6b54' : '#7a4242'"></span>
-      <span class="label" [style.color]="wsService.isConnected() ? '#3d6b54' : '#7a4242'">
-        {{ wsService.isConnected() ? 'YOLO ONLINE' : 'OFFLINE' }}
-      </span>
+
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-1.5">
+        <span class="status-dot" [style.background]="wsService.isConnected() ? '#3d6b54' : '#7a4242'"></span>
+        <span class="label" [style.color]="wsService.isConnected() ? '#3d6b54' : '#7a4242'">
+          {{ wsService.isConnected() ? 'YOLO INFERENCE LINKED' : 'STANDALONE' }}
+        </span>
+      </div>
+      <span class="hairline hidden sm:inline-block" style="border-left:1px solid; height:0.65rem"></span>
+      <span class="label hidden sm:inline-block">BUILD 4.2-DEF</span>
     </div>
   </div>
 
-  <header class="border-b hairline sticky top-0 z-40" style="background:#0b0b09">
+  <header class="border-b hairline sticky top-0 z-40" style="background:rgba(11,11,9,0.92); backdrop-filter:blur(12px)">
     <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center space-x-2.5">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#a88840" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-          </svg>
+      <div class="flex items-center space-x-5">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 flex items-center justify-center border hairline" style="background:#141412; border-radius:2px">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#a88840" stroke-width="1.75">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </div>
           <div>
-            <div class="font-sans font-semibold text-sm tracking-tight" style="color:#d0cdc4">ASTROVISION</div>
-            <div class="label" style="letter-spacing:0.14em">SURVEILLANCE COMMAND</div>
+            <div class="flex items-center space-x-2">
+              <span class="font-sans font-semibold text-sm tracking-tight" style="color:#f0ede6; letter-spacing:0.04em">ASTROVISION</span>
+              <span class="tag" style="border-radius:2px; font-size:0.55rem; padding:0.05rem 0.35rem">CCTV-OPS</span>
+            </div>
+            <div class="label" style="letter-spacing:0.18em; font-size:0.55rem">SURVEILLANCE &amp; RECONNAISSANCE MATRIX</div>
           </div>
         </div>
 
-        <div class="hidden sm:block w-px h-6 hairline" style="border-left:1px solid rgba(210,205,195,0.1)"></div>
+        <div class="hidden md:block w-px h-6 hairline" style="border-left:1px solid rgba(210,205,195,0.1)"></div>
 
-        <nav class="hidden sm:flex items-center space-x-1">
+        <nav class="hidden md:flex items-center space-x-1">
           <button
             type="button"
             (click)="setActiveTab('feed')"
-            [style.color]="activeTab() === 'feed' ? '#d0cdc4' : '#524f4b'"
-            [style.border-bottom]="activeTab() === 'feed' ? '1px solid #a88840' : '1px solid transparent'"
-            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
-            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
-            SENSOR FEED
+            [style.color]="activeTab() === 'feed' ? '#f0ede6' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'feed' ? '2px solid #a88840' : '2px solid transparent'"
+            class="px-3.5 py-2 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.12em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.65rem">
+            01 // SENSOR FEED
           </button>
           <button
             type="button"
             (click)="setActiveTab('admin')"
-            [style.color]="activeTab() === 'admin' ? '#d0cdc4' : '#524f4b'"
-            [style.border-bottom]="activeTab() === 'admin' ? '1px solid #a88840' : '1px solid transparent'"
-            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
-            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
-            ADMIN MATRIX
+            [style.color]="activeTab() === 'admin' ? '#f0ede6' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'admin' ? '2px solid #a88840' : '2px solid transparent'"
+            class="px-3.5 py-2 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.12em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.65rem">
+            02 // COMMAND MATRIX
           </button>
           <button
             type="button"
             (click)="setActiveTab('logs')"
-            [style.color]="activeTab() === 'logs' ? '#d0cdc4' : '#524f4b'"
-            [style.border-bottom]="activeTab() === 'logs' ? '1px solid #a88840' : '1px solid transparent'"
-            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
-            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
-            ACTIVITY LOG
-            <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag">{{ logService.logs().length }}</span>
+            [style.color]="activeTab() === 'logs' ? '#f0ede6' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'logs' ? '2px solid #a88840' : '2px solid transparent'"
+            class="px-3.5 py-2 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.12em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.65rem">
+            03 // TELEMETRY
+            <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag" style="border-radius:2px">{{ logService.logs().length }}</span>
           </button>
           <button
             type="button"
             (click)="setActiveTab('alerts')"
-            [style.color]="activeTab() === 'alerts' ? '#d0cdc4' : '#524f4b'"
-            [style.border-bottom]="activeTab() === 'alerts' ? '1px solid #a88840' : '1px solid transparent'"
-            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
-            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
-            INCIDENTS
-            <span *ngIf="alertsService.metrics().highRiskCount > 0" class="ml-1.5 tag tag-red">{{ alertsService.metrics().highRiskCount }}</span>
+            [style.color]="activeTab() === 'alerts' ? '#f0ede6' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'alerts' ? '2px solid #a88840' : '2px solid transparent'"
+            class="px-3.5 py-2 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.12em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.65rem">
+            04 // INCIDENTS
+            <span *ngIf="alertsService.metrics().highRiskCount > 0" class="ml-1.5 tag tag-red" style="border-radius:2px">{{ alertsService.metrics().highRiskCount }}</span>
           </button>
         </nav>
       </div>
 
       <div class="flex items-center space-x-3">
-        <div *ngIf="authService.currentUser() as user" class="flex items-center space-x-2.5 panel px-3 py-1.5" style="border-radius:2px">
-          <img *ngIf="user.picture" [src]="user.picture" alt="Operator" class="w-5 h-5 rounded-full object-cover"/>
-          <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono" style="background:#1e1e1c; color:#8c8880">
+        <div *ngIf="authService.currentUser() as user" class="flex items-center space-x-2.5 border hairline px-2.5 py-1.5" style="border-radius:2px; background:#111110">
+          <img *ngIf="user.picture" [src]="user.picture" alt="Operator" class="w-5 h-5 rounded-full object-cover border hairline"/>
+          <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono" style="background:#171715; color:#a88840">
             {{ user.name.slice(0,1).toUpperCase() }}
           </div>
           <div class="hidden sm:flex flex-col">
             <span class="text-xs font-sans font-medium truncate max-w-[120px]" style="color:#d0cdc4">{{ user.name }}</span>
-            <span class="label" style="color:#3d6b54">OPERATOR CLEARED</span>
+            <span class="label" style="color:#3d6b54; font-size:0.5rem">OPERATOR CLEARED</span>
           </div>
-          <button type="button" (click)="authService.signOut()" class="btn-ghost" style="padding:0.15rem 0.5rem; font-size:0.65rem">&times;</button>
+          <button type="button" (click)="authService.signOut()" class="btn-ghost" style="padding:0.15rem 0.45rem; font-size:0.65rem; border-radius:2px" title="Sign out">&times;</button>
         </div>
 
         <button
@@ -96,18 +109,18 @@
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>AUTHENTICATE</span>
+          <span>CLEARANCE LOGIN</span>
         </button>
 
         <div #headerGoogleBtn></div>
       </div>
     </div>
 
-    <div class="sm:hidden border-t hairline px-4 py-2 flex" style="background:#0b0b09">
-      <button type="button" (click)="setActiveTab('feed')" [style.color]="activeTab() === 'feed' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">FEED</button>
-      <button type="button" (click)="setActiveTab('admin')" [style.color]="activeTab() === 'admin' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">ADMIN</button>
-      <button type="button" (click)="setActiveTab('logs')" [style.color]="activeTab() === 'logs' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">LOGS</button>
-      <button type="button" (click)="setActiveTab('alerts')" [style.color]="activeTab() === 'alerts' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">INCIDENTS</button>
+    <div class="md:hidden border-t hairline px-3 py-1 flex overflow-x-auto" style="background:#0e0e0c">
+      <button type="button" (click)="setActiveTab('feed')" [style.color]="activeTab() === 'feed' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer; font-size:0.6rem">01 // FEED</button>
+      <button type="button" (click)="setActiveTab('admin')" [style.color]="activeTab() === 'admin' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer; font-size:0.6rem">02 // MATRIX</button>
+      <button type="button" (click)="setActiveTab('logs')" [style.color]="activeTab() === 'logs' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer; font-size:0.6rem">03 // LOGS</button>
+      <button type="button" (click)="setActiveTab('alerts')" [style.color]="activeTab() === 'alerts' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer; font-size:0.6rem">04 // ALERTS</button>
     </div>
   </header>
 
@@ -116,7 +129,7 @@
     <div *ngIf="activeTab() === 'feed'">
       <div class="hidden lg:grid lg:grid-cols-12 gap-5">
         <div class="lg:col-span-8 flex flex-col space-y-5">
-          <div style="height:520px">
+          <div style="height:530px">
             <app-camera-stream></app-camera-stream>
           </div>
           <app-detection-log></app-detection-log>
@@ -126,8 +139,12 @@
         </div>
       </div>
 
-      <div class="lg:hidden" style="height:460px">
-        <app-camera-stream></app-camera-stream>
+      <div class="lg:hidden flex flex-col space-y-5">
+        <div style="height:480px">
+          <app-camera-stream></app-camera-stream>
+        </div>
+        <app-detection-log></app-detection-log>
+        <app-alerts-sidebar></app-alerts-sidebar>
       </div>
     </div>
 
@@ -145,30 +162,36 @@
 
   </main>
 
-  <footer class="border-t hairline px-6 py-3" style="background:#0b0b09">
-    <div class="max-w-screen-xl mx-auto flex items-center justify-between">
-      <span class="label">ASTROVISION &bull; ULTRALYTICS YOLO11 &bull; KYSELY POSTGRESQL</span>
-      <span class="label">SYSTEM OPERATIONAL</span>
+  <footer class="border-t hairline px-4 sm:px-6 py-3.5 mt-auto" style="background:#0e0e0c">
+    <div class="max-w-screen-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center space-x-3">
+        <span class="status-dot animate-live" style="background:#3d6b54"></span>
+        <span class="label">ASTROVISION RECONNAISSANCE MATRIX &bull; ULTRALYTICS YOLO11 &bull; KYSELY POSTGRESQL</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="label">SECURITY CLASSIFICATION: LEVEL 2</span>
+        <span class="label" style="color:#3d6b54">ALL NODES SYNCHRONIZED</span>
+      </div>
     </div>
   </footer>
 
-  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(11,11,9,0.95)">
-    <div class="panel max-w-sm w-full flex flex-col" style="border-radius:2px; overflow:hidden">
+  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(11,11,9,0.94); backdrop-filter:blur(8px)">
+    <div class="border hairline max-w-sm w-full flex flex-col shadow-2xl" style="border-radius:2px; background:#111110">
 
-      <div class="flex items-center justify-between px-5 py-4 border-b hairline" style="background:#111110">
+      <div class="flex items-center justify-between px-5 py-4 border-b hairline" style="background:#141412">
         <div>
-          <div class="text-xs font-mono font-semibold uppercase tracking-wider" style="color:#d0cdc4; letter-spacing:0.14em">OPERATOR AUTHENTICATION</div>
-          <div class="label mt-0.5">SURVEILLANCE COMMAND CLEARANCE REQUIRED</div>
+          <div class="font-mono text-xs font-semibold uppercase tracking-wider" style="color:#f0ede6; letter-spacing:0.14em">OPERATOR CLEARANCE</div>
+          <div class="label mt-0.5">SURVEILLANCE COMMAND LEVEL 2 REQUIRED</div>
         </div>
-        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost" style="padding:0.2rem 0.5rem">&times;</button>
+        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost" style="padding:0.2rem 0.5rem; border-radius:2px">&times;</button>
       </div>
 
       <div *ngIf="authService.authErrorMessage()" class="px-5 py-3 border-b hairline" style="background:rgba(122,66,66,0.08); color:#7a4242">
-        <span class="text-xs font-mono">{{ authService.authErrorMessage() }}</span>
+        <span class="font-mono text-xs">{{ authService.authErrorMessage() }}</span>
       </div>
 
       <div class="p-5 flex flex-col space-y-4">
-        <div class="flex flex-col items-center space-y-3 py-4 border hairline" style="border-radius:2px">
+        <div class="flex flex-col items-center space-y-3 py-4 border hairline" style="border-radius:2px; background:#0b0b09">
           <svg class="w-8 h-8" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -183,14 +206,14 @@
             [disabled]="authService.isAuthenticating()"
             class="btn-primary w-full text-center"
             style="border-radius:2px">
-            {{ authService.isAuthenticating() ? 'AUTHENTICATING...' : 'SIGN IN WITH GOOGLE' }}
+            {{ authService.isAuthenticating() ? 'VERIFYING CREDENTIALS...' : 'SIGN IN WITH GOOGLE' }}
           </button>
           <button
             type="button"
             (click)="triggerDirectGoogleRedirect()"
             class="btn-ghost w-full text-center"
             style="border-radius:2px">
-            GOOGLE REDIRECT (NO POPUP)
+            DIRECT REDIRECT FLOW
           </button>
         </div>
 
@@ -200,7 +223,7 @@
             (click)="triggerOperatorQuickAccess()"
             class="label hover:underline transition-colors"
             style="background:transparent; border:none; cursor:pointer; color:#524f4b">
-            OPERATOR PASSKEY ACCESS
+            OPERATOR ROOT PASSKEY CLEARANCE
           </button>
         </div>
       </div>
