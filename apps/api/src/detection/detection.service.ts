@@ -272,6 +272,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     clientDetectedBoxes?: BoundingBox[],
     stationId?: string,
     stationName?: string,
+    userId?: string,
   ): Promise<FrameProcessingResult> {
     const activeZones = await this.detectionRepository.findActiveZones();
     const zones = activeZones.map((z) => ({
@@ -289,6 +290,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       source,
       stationId: stationId || 'CCTV-MAIN',
       stationName: stationName || 'CCTV Optical Sensor',
+      userId,
       zones,
       calibration: {
         confidenceThreshold: this.activeConfig.confidenceThreshold,
@@ -319,7 +321,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
             workerResult.boxes.map((b) => b.label),
           );
           await this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData);
-          await this.persistAnalyzedDetections(workerResult, stationId, stationName);
+          await this.persistAnalyzedDetections(workerResult, stationId, stationName, userId);
           return workerResult;
         }
       } catch (err: unknown) {
@@ -352,7 +354,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         result.boxes.map((b) => b.label),
       );
       await this.evaluateSuspicionAndTriggerAlerts(result, frameData);
-      await this.persistAnalyzedDetections(result, stationId, stationName);
+      await this.persistAnalyzedDetections(result, stationId, stationName, userId);
       return result;
     }
 
@@ -557,6 +559,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     result: FrameProcessingResult,
     stationId?: string,
     stationName?: string,
+    userId?: string,
   ): Promise<void> {
     if (!result.boxes || result.boxes.length === 0) {
       return;
@@ -568,6 +571,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     const records: NewDetectionLogRecord[] = result.boxes.map((box) => {
       const sus = suspicionMap.get(box.trackId);
       return {
+        user_id: userId || null,
         station_id: stationId || 'CCTV-MAIN',
         station_name: stationName || 'CCTV Optical Sensor',
         frame_index: result.frameIndex,
@@ -587,12 +591,16 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async getDetectionLogs(limit: number = 100): Promise<DetectionLogRecord[]> {
-    return await this.detectionRepository.getRecentDetectionLogs(limit);
+  public async getDetectionLogs(limit: number = 100, userId?: string): Promise<DetectionLogRecord[]> {
+    return await this.detectionRepository.getRecentDetectionLogs(limit, userId);
   }
 
   public async saveDetectionLogsBatch(logs: NewDetectionLogRecord[]): Promise<DetectionLogRecord[]> {
     return await this.detectionRepository.createDetectionLogsBatch(logs);
+  }
+
+  public async deleteDetectionLogs(userId?: string): Promise<boolean> {
+    return await this.detectionRepository.deleteDetectionLogs(userId);
   }
 }
 

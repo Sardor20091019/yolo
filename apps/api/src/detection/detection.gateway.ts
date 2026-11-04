@@ -18,6 +18,7 @@ interface StreamFramePayload {
   source?: 'WEBCAM' | 'IP_CAMERA';
   stationId?: string;
   stationName?: string;
+  userId?: string;
   detectedBoxes?: Array<{
     trackId: number;
     label: string;
@@ -65,6 +66,7 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       payload.detectedBoxes,
       payload.stationId,
       payload.stationName,
+      payload.userId,
     );
 
     client.emit('detection_results', result);
@@ -87,4 +89,3 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
     return updated;
   }
 }
-

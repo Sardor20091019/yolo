@@ -3,6 +3,18 @@ import { Database } from './database.types';
 
 export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<void> {
   await db.schema
+    .createTable('users')
+    .ifNotExists()
+    .addColumn('id', 'varchar(128)', (col) => col.primaryKey())
+    .addColumn('email', 'varchar(255)')
+    .addColumn('name', 'varchar(128)', (col) => col.notNull())
+    .addColumn('picture', 'text', (col) => col.notNull().defaultTo(''))
+    .addColumn('role', 'varchar(32)', (col) => col.notNull().defaultTo('OPERATOR'))
+    .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
+    .addColumn('updated_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
+    .execute();
+
+  await db.schema
     .createTable('alerts')
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
@@ -46,6 +58,7 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .createTable('detection_logs')
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+    .addColumn('user_id', 'varchar(128)')
     .addColumn('station_id', 'varchar(64)', (col) => col.notNull().defaultTo('CCTV-NODE-01'))
     .addColumn('station_name', 'varchar(128)', (col) => col.notNull().defaultTo('Optical Sensor Alpha'))
     .addColumn('frame_index', 'integer', (col) => col.notNull().defaultTo(0))
@@ -57,4 +70,11 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .addColumn('triggers', 'text', (col) => col.notNull().defaultTo('[]'))
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
     .execute();
+
+  try {
+    await db.schema
+      .alterTable('detection_logs')
+      .addColumn('user_id', 'varchar(128)')
+      .execute();
+  } catch {}
 }

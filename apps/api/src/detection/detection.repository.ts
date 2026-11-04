@@ -107,12 +107,30 @@ export class DetectionRepository {
       .execute();
   }
 
-  public async getRecentDetectionLogs(limit: number = 100): Promise<DetectionLogRecord[]> {
-    return await this.databaseService.db
+  public async getRecentDetectionLogs(limit: number = 100, userId?: string): Promise<DetectionLogRecord[]> {
+    let query = this.databaseService.db
       .selectFrom('detection_logs')
-      .selectAll()
+      .selectAll();
+
+    if (userId) {
+      query = query.where('user_id', '=', userId);
+    }
+
+    return await query
       .orderBy('created_at', 'desc')
       .limit(limit)
       .execute();
+  }
+
+  public async deleteDetectionLogs(userId?: string): Promise<boolean> {
+    let query = this.databaseService.db
+      .deleteFrom('detection_logs');
+
+    if (userId) {
+      query = query.where('user_id', '=', userId);
+    }
+
+    const res = await query.executeTakeFirst();
+    return Number(res.numDeletedRows) > 0;
   }
 }

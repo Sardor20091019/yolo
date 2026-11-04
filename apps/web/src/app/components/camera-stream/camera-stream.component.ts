@@ -501,6 +501,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       [],
       this.stationId(),
       this.stationName(),
+      this.logService.currentUser().id,
     );
   }
 

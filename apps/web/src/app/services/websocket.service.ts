@@ -71,6 +71,7 @@ export class WebSocketService {
     detectedBoxes?: any[],
     stationId?: string,
     stationName?: string,
+    userId?: string,
   ): void {
     if (this.socket && this.isConnected()) {
       this.socket.emit('stream_frame', {
@@ -80,6 +81,7 @@ export class WebSocketService {
         detectedBoxes,
         stationId,
         stationName,
+        userId,
       });
       return;
     }
@@ -96,6 +98,7 @@ export class WebSocketService {
       detectedBoxes,
       stationId,
       stationName,
+      userId,
     }).subscribe({
       next: (result) => {
         this.latestResult.set(result);

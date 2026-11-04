@@ -1,5 +1,19 @@
 import { ColumnType, Generated, Selectable, Insertable, Updateable } from 'kysely';
 
+export interface UsersTable {
+  id: string;
+  email: string | null;
+  name: string;
+  picture: string;
+  role: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export type UserRecord = Selectable<UsersTable>;
+export type NewUserRecord = Insertable<UsersTable>;
+export type UserUpdateRecord = Updateable<UsersTable>;
+
 export interface AlertsTable {
   id: Generated<string>;
   track_id: number;
@@ -47,6 +61,7 @@ export type NewDetectionEventRecord = Insertable<DetectionEventsTable>;
 
 export interface DetectionLogsTable {
   id: Generated<string>;
+  user_id: string | null;
   station_id: string;
   station_name: string;
   frame_index: number;
@@ -63,6 +78,7 @@ export type DetectionLogRecord = Selectable<DetectionLogsTable>;
 export type NewDetectionLogRecord = Insertable<DetectionLogsTable>;
 
 export interface Database {
+  users: UsersTable;
   alerts: AlertsTable;
   detection_zones: DetectionZonesTable;
   detection_events: DetectionEventsTable;

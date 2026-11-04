@@ -25,6 +25,10 @@ export class FrameDetectionDto {
   @IsOptional()
   stationName?: string;
 
+  @IsString()
+  @IsOptional()
+  userId?: string;
+
   @IsOptional()
   detectedBoxes?: Array<{
     trackId: number;

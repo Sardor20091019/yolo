@@ -30,6 +30,7 @@ export class DetectionController {
       frameDto.detectedBoxes,
       frameDto.stationId,
       frameDto.stationName,
+      frameDto.userId,
     );
   }
 
@@ -39,9 +40,18 @@ export class DetectionController {
   }
 
   @Get('logs')
-  public async getDetectionLogs(@Query('limit') limit?: string): Promise<DetectionLogRecord[]> {
+  public async getDetectionLogs(
+    @Query('limit') limit?: string,
+    @Query('userId') userId?: string,
+  ): Promise<DetectionLogRecord[]> {
     const num = limit ? parseInt(limit, 10) : 100;
-    return await this.detectionService.getDetectionLogs(num);
+    return await this.detectionService.getDetectionLogs(num, userId);
+  }
+
+  @Delete('logs')
+  public async deleteDetectionLogs(@Query('userId') userId?: string): Promise<{ success: boolean }> {
+    const success = await this.detectionService.deleteDetectionLogs(userId);
+    return { success };
   }
 
   @Post('logs')

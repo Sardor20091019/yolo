@@ -5,6 +5,8 @@ import { BoundingBox } from '../models/detection.model';
 export interface UserProfile {
   id: string;
   name: string;
+  email?: string | null;
+  picture?: string;
   createdAt: string;
 }
 
@@ -26,14 +28,12 @@ export interface DetectionLogEntry {
 export class DetectionLogService {
   private readonly USERS_STORAGE_KEY: string = 'astro_detection_users';
   private readonly ACTIVE_USER_STORAGE_KEY: string = 'astro_detection_active_user';
-  private readonly LOGS_STORAGE_PREFIX: string = 'astro_detection_logs_';
-  private readonly MAX_LOGS_PER_USER: number = 250;
   private readonly apiBaseUrl: string;
 
   public readonly users: WritableSignal<UserProfile[]> = signal<UserProfile[]>([]);
   public readonly currentUser: WritableSignal<UserProfile> = signal<UserProfile>({
     id: 'usr_default',
-    name: 'Operator 1',
+    name: 'Primary Operator',
     createdAt: new Date().toISOString(),
   });
   public readonly logs: WritableSignal<DetectionLogEntry[]> = signal<DetectionLogEntry[]>([]);
@@ -82,82 +82,110 @@ export class DetectionLogService {
     const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
     this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
 
-    this.initializeState();
-    this.fetchDatabaseLogs();
+    this.restoreLocalCache();
+    this.syncUsersFromDatabase();
   }
 
-  private initializeState(): void {
+  private restoreLocalCache(): void {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
-
     try {
-      const storedUsersJson = localStorage.getItem(this.USERS_STORAGE_KEY);
-      let loadedUsers: UserProfile[] = [];
-      if (storedUsersJson) {
-        loadedUsers = JSON.parse(storedUsersJson);
+      const stored = localStorage.getItem(this.USERS_STORAGE_KEY);
+      if (stored) {
+        const parsed: UserProfile[] = JSON.parse(stored);
+        if (parsed.length > 0) {
+          this.users.set(parsed);
+          const activeId = localStorage.getItem(this.ACTIVE_USER_STORAGE_KEY);
+          const active = parsed.find((u) => u.id === activeId) || parsed[0];
+          this.currentUser.set(active);
+        }
       }
-
-      if (loadedUsers.length === 0) {
-        const initialUser: UserProfile = {
-          id: 'usr_' + Math.random().toString(36).substring(2, 9),
-          name: 'Primary Operator',
-          createdAt: new Date().toISOString(),
-        };
-        loadedUsers = [initialUser];
-        localStorage.setItem(this.USERS_STORAGE_KEY, JSON.stringify(loadedUsers));
-      }
-
-      this.users.set(loadedUsers);
-
-      const activeUserId = localStorage.getItem(this.ACTIVE_USER_STORAGE_KEY);
-      const matchedUser = loadedUsers.find((u) => u.id === activeUserId);
-      const selectedUser = matchedUser || loadedUsers[0];
-
-      this.currentUser.set(selectedUser);
-      localStorage.setItem(this.ACTIVE_USER_STORAGE_KEY, selectedUser.id);
-
-      this.loadLogsForUser(selectedUser.id);
-    } catch {
-      const fallbackUser: UserProfile = {
-        id: 'usr_default',
-        name: 'Primary Operator',
-        createdAt: new Date().toISOString(),
-      };
-      this.users.set([fallbackUser]);
-      this.currentUser.set(fallbackUser);
-    }
+    } catch {}
   }
 
-  public fetchDatabaseLogs(): void {
-    this.http.get<any[]>(`${this.apiBaseUrl}/detection/logs?limit=150`).subscribe({
+  public syncUsersFromDatabase(): void {
+    this.http.get<any[]>(`${this.apiBaseUrl}/users`).subscribe({
+      next: (dbUsers) => {
+        if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+          const mapped: UserProfile[] = dbUsers.map((u) => ({
+            id: u.id,
+            name: u.name || 'Operator',
+            email: u.email,
+            picture: u.picture,
+            createdAt: u.created_at ? new Date(u.created_at).toISOString() : new Date().toISOString(),
+          }));
+
+          this.users.set(mapped);
+          this.persistUsersCache(mapped);
+
+          let current = mapped.find((u) => u.id === this.currentUser().id);
+          if (!current) {
+            current = mapped[0];
+          }
+          this.currentUser.set(current);
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem(this.ACTIVE_USER_STORAGE_KEY, current.id);
+          }
+          this.loadLogsForUser(current.id);
+        } else {
+          this.createInitialUserInDb();
+        }
+      },
+      error: () => {
+        this.loadLogsForUser(this.currentUser().id);
+      },
+    });
+  }
+
+  private createInitialUserInDb(): void {
+    this.http.post<any>(`${this.apiBaseUrl}/users`, { name: 'Primary Operator' }).subscribe({
+      next: (created) => {
+        if (created) {
+          const profile: UserProfile = {
+            id: created.id,
+            name: created.name,
+            email: created.email,
+            picture: created.picture,
+            createdAt: created.created_at ? new Date(created.created_at).toISOString() : new Date().toISOString(),
+          };
+          this.users.set([profile]);
+          this.currentUser.set(profile);
+          this.persistUsersCache([profile]);
+          this.loadLogsForUser(profile.id);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  public loadLogsForUser(userId: string): void {
+    this.http.get<any[]>(`${this.apiBaseUrl}/detection/logs?userId=${encodeURIComponent(userId)}&limit=250`).subscribe({
       next: (records) => {
         if (!Array.isArray(records) || records.length === 0) {
+          this.logs.set([]);
           return;
         }
 
         const map = new Map<string, DetectionLogEntry>();
-        const existingLogs = this.logs();
-        existingLogs.forEach((l) => map.set(l.label.toLowerCase(), { ...l }));
-
         records.forEach((r) => {
-          const lbl = (r.label || '').toLowerCase();
+          const lbl = (r.label || '').toLowerCase().trim();
           if (!lbl) return;
-          const ex = map.get(lbl);
           const createdAt = r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString();
-          if (ex) {
-            ex.occurrences += 1;
-            ex.confidence = Math.max(ex.confidence, r.confidence || 0);
-            if (createdAt > ex.lastSeen) {
-              ex.lastSeen = createdAt;
+          const existing = map.get(lbl);
+          if (existing) {
+            existing.occurrences += 1;
+            existing.confidence = Math.max(existing.confidence, r.confidence || 0);
+            if (createdAt > existing.lastSeen) {
+              existing.lastSeen = createdAt;
             }
-            if (createdAt < ex.firstSeen) {
-              ex.firstSeen = createdAt;
+            if (createdAt < existing.firstSeen) {
+              existing.firstSeen = createdAt;
             }
           } else {
             map.set(lbl, {
               id: r.id || 'db_' + Math.random().toString(36).substring(2, 8),
-              userId: this.currentUser().id,
+              userId,
               label: r.label,
               confidence: r.confidence || 0.9,
               firstSeen: createdAt,
@@ -169,31 +197,11 @@ export class DetectionLogService {
           }
         });
 
-        const merged = Array.from(map.values()).sort((a, b) => (b.lastSeen > a.lastSeen ? 1 : -1));
-        this.logs.set(merged);
-        this.persistLogs(this.currentUser().id, merged);
+        const sorted = Array.from(map.values()).sort((a, b) => (b.lastSeen > a.lastSeen ? 1 : -1));
+        this.logs.set(sorted);
       },
       error: () => {},
     });
-  }
-
-  public loadLogsForUser(userId: string): void {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return;
-    }
-
-    try {
-      const key = `${this.LOGS_STORAGE_PREFIX}${userId}`;
-      const data = localStorage.getItem(key);
-      if (data) {
-        const parsed: DetectionLogEntry[] = JSON.parse(data);
-        this.logs.set(parsed);
-      } else {
-        this.logs.set([]);
-      }
-    } catch {
-      this.logs.set([]);
-    }
   }
 
   public recordDetections(boxes: BoundingBox[]): void {
@@ -208,6 +216,7 @@ export class DetectionLogService {
     let hasModifications = false;
 
     const dbPayload = boxes.map((b) => ({
+      user_id: user.id,
       station_id: 'CCTV-NODE-01',
       station_name: user.name,
       frame_index: 0,
@@ -261,23 +270,10 @@ export class DetectionLogService {
     });
 
     if (hasModifications) {
-      if (currentLogs.length > this.MAX_LOGS_PER_USER) {
-        currentLogs = currentLogs.slice(0, this.MAX_LOGS_PER_USER);
+      if (currentLogs.length > 250) {
+        currentLogs = currentLogs.slice(0, 250);
       }
       this.logs.set(currentLogs);
-      this.persistLogs(user.id, currentLogs);
-    }
-  }
-
-  private persistLogs(userId: string, entries: DetectionLogEntry[]): void {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return;
-    }
-    try {
-      const key = `${this.LOGS_STORAGE_PREFIX}${userId}`;
-      localStorage.setItem(key, JSON.stringify(entries));
-    } catch {
-      return;
     }
   }
 
@@ -295,23 +291,26 @@ export class DetectionLogService {
     this.loadLogsForUser(user.id);
   }
 
-  public createUser(name: string): UserProfile {
+  public createUser(name: string): void {
     const trimmed = name.trim() || `Operator ${this.users().length + 1}`;
-    const newUser: UserProfile = {
-      id: 'usr_' + Math.random().toString(36).substring(2, 9),
-      name: trimmed,
-      createdAt: new Date().toISOString(),
-    };
-
-    const updatedUsers = [...this.users(), newUser];
-    this.users.set(updatedUsers);
-
-    if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(this.USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-    }
-
-    this.switchUser(newUser.id);
-    return newUser;
+    this.http.post<any>(`${this.apiBaseUrl}/users`, { name: trimmed }).subscribe({
+      next: (created) => {
+        if (created) {
+          const profile: UserProfile = {
+            id: created.id,
+            name: created.name,
+            email: created.email,
+            picture: created.picture,
+            createdAt: created.created_at ? new Date(created.created_at).toISOString() : new Date().toISOString(),
+          };
+          const updated = [...this.users(), profile];
+          this.users.set(updated);
+          this.persistUsersCache(updated);
+          this.switchUser(profile.id);
+        }
+      },
+      error: () => {},
+    });
   }
 
   public deleteUser(userId: string): void {
@@ -319,25 +318,36 @@ export class DetectionLogService {
       return;
     }
 
-    const filtered = this.users().filter((u) => u.id !== userId);
-    this.users.set(filtered);
+    this.http.delete(`${this.apiBaseUrl}/users/${encodeURIComponent(userId)}`).subscribe({
+      next: () => {
+        const filtered = this.users().filter((u) => u.id !== userId);
+        this.users.set(filtered);
+        this.persistUsersCache(filtered);
 
-    if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(this.USERS_STORAGE_KEY, JSON.stringify(filtered));
-      localStorage.removeItem(`${this.LOGS_STORAGE_PREFIX}${userId}`);
-    }
+        this.http.delete(`${this.apiBaseUrl}/detection/logs?userId=${encodeURIComponent(userId)}`).subscribe({
+          error: () => {},
+        });
 
-    if (this.currentUser().id === userId) {
-      this.switchUser(filtered[0].id);
-    }
+        if (this.currentUser().id === userId) {
+          this.switchUser(filtered[0].id);
+        }
+      },
+      error: () => {},
+    });
   }
 
   public clearLogs(): void {
     const user = this.currentUser();
     this.logs.set([]);
     this.lastRecordedTimeByLabel.clear();
+    this.http.delete(`${this.apiBaseUrl}/detection/logs?userId=${encodeURIComponent(user.id)}`).subscribe({
+      error: () => {},
+    });
+  }
+
+  private persistUsersCache(users: UserProfile[]): void {
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.removeItem(`${this.LOGS_STORAGE_PREFIX}${user.id}`);
+      localStorage.setItem(this.USERS_STORAGE_KEY, JSON.stringify(users));
     }
   }
 
