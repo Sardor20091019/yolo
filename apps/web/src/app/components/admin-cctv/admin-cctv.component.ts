@@ -105,3 +105,4 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
     return `${Math.floor(diff / 60)}m ago`;
   }
 }
+

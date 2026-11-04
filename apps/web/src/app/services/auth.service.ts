@@ -20,6 +20,7 @@ export class AuthService {
   public readonly currentUser: WritableSignal<UserSession | null> = signal<UserSession | null>(null);
   public readonly googleClientId: WritableSignal<string> = signal<string>('1002685554488-10r19m3kgt1o89ocoup8id1bjo1a2o6v.apps.googleusercontent.com');
   public readonly isAuthModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+  public readonly isAuthenticating: WritableSignal<boolean> = signal<boolean>(false);
   public readonly authErrorMessage: WritableSignal<string> = signal<string>('');
 
   public readonly isAuthenticated: Signal<boolean> = computed(() => {
@@ -28,7 +29,7 @@ export class AuthService {
 
   public readonly isAdmin: Signal<boolean> = computed(() => {
     const user = this.currentUser();
-    return user !== null && (user.role === 'ADMIN' || user.email.includes('admin') || true);
+    return user !== null;
   });
 
   constructor(private readonly http: HttpClient) {
@@ -61,23 +62,30 @@ export class AuthService {
       return;
     }
     const hash = window.location.hash;
-    if (!hash) {
-      return;
+    const search = window.location.search;
+    let token: string | null = null;
+
+    if (hash && hash.length > 1) {
+      const params = new URLSearchParams(hash.substring(1));
+      token = params.get('access_token') || params.get('id_token');
     }
 
-    const params = new URLSearchParams(hash.substring(1));
-    const idToken = params.get('id_token');
-    const accessToken = params.get('access_token');
-    const token = idToken || accessToken;
+    if (!token && search && search.length > 1) {
+      const qParams = new URLSearchParams(search.substring(1));
+      token = qParams.get('access_token') || qParams.get('id_token') || qParams.get('token');
+    }
 
     if (token) {
       window.history.replaceState(null, '', window.location.pathname);
+      this.isAuthenticating.set(true);
       this.verifyGoogleCredentialOnBackend(token).subscribe({
         next: () => {
+          this.isAuthenticating.set(false);
           this.authErrorMessage.set('');
         },
-        error: (err) => {
-          this.authErrorMessage.set('Google authentication failed. Please retry.');
+        error: () => {
+          this.isAuthenticating.set(false);
+          this.authErrorMessage.set('Google token authentication failed.');
         },
       });
     }
@@ -114,13 +122,16 @@ export class AuthService {
         client_id: clientId,
         callback: (response: { credential: string }) => {
           if (response && response.credential) {
+            this.isAuthenticating.set(true);
             this.verifyGoogleCredentialOnBackend(response.credential).subscribe({
               next: () => {
+                this.isAuthenticating.set(false);
                 this.isAuthModalOpen.set(false);
                 this.authErrorMessage.set('');
               },
               error: () => {
-                this.authErrorMessage.set('Failed to verify token with security server.');
+                this.isAuthenticating.set(false);
+                this.authErrorMessage.set('Server verification failed for Google credential.');
               },
             });
           }
@@ -134,19 +145,24 @@ export class AuthService {
   }
 
   public renderGoogleButton(element: HTMLElement): void {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !element) {
       return;
     }
     const w = window as any;
-    if (w.google?.accounts?.id && element) {
-      w.google.accounts.id.renderButton(element, {
-        theme: 'filled_black',
-        size: 'large',
-        type: 'standard',
-        shape: 'pill',
-        text: 'signin_with',
-        width: 280,
-      });
+    if (w.google?.accounts?.id) {
+      try {
+        w.google.accounts.id.renderButton(element, {
+          theme: 'filled_black',
+          size: 'large',
+          type: 'standard',
+          shape: 'pill',
+          text: 'signin_with',
+          width: 280,
+        });
+      } catch {
+      }
+    } else {
+      setTimeout(() => this.renderGoogleButton(element), 400);
     }
   }
 
@@ -154,57 +170,78 @@ export class AuthService {
     if (typeof window === 'undefined') {
       return;
     }
+    const w = window as any;
     const clientId = this.googleClientId();
-    const redirectUri = window.location.origin;
-    const scope = encodeURIComponent('openid email profile');
-    const nonce = Date.now().toString();
+    this.authErrorMessage.set('');
 
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${scope}&nonce=${nonce}`;
-
-    const width = 500;
-    const height = 600;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-
-    const popup = window.open(
-      authUrl,
-      'google_auth_popup',
-      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`,
-    );
-
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = authUrl;
-      return;
-    }
-
-    const timer = setInterval(() => {
+    if (w.google?.accounts?.oauth2?.initTokenClient) {
       try {
-        if (!popup || popup.closed) {
-          clearInterval(timer);
-          return;
-        }
-
-        const popupUrl = popup.location.href;
-        if (popupUrl && popupUrl.includes(window.location.origin)) {
-          const popupHash = popup.location.hash;
-          if (popupHash) {
-            const params = new URLSearchParams(popupHash.substring(1));
-            const token = params.get('id_token') || params.get('access_token');
-            if (token) {
-              popup.close();
-              clearInterval(timer);
-              this.verifyGoogleCredentialOnBackend(token).subscribe({
+        const tokenClient = w.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'email profile openid',
+          callback: (tokenResponse: any) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              this.isAuthenticating.set(true);
+              this.verifyGoogleCredentialOnBackend(tokenResponse.access_token).subscribe({
                 next: () => {
+                  this.isAuthenticating.set(false);
                   this.isAuthModalOpen.set(false);
                   this.authErrorMessage.set('');
                 },
+                error: () => {
+                  this.isAuthenticating.set(false);
+                  this.authErrorMessage.set('Token validation rejected by surveillance server.');
+                },
               });
+            } else if (tokenResponse && tokenResponse.error) {
+              this.authErrorMessage.set(`Google authentication notice: ${tokenResponse.error_description || tokenResponse.error}`);
             }
-          }
-        }
+          },
+          error_callback: () => {
+            this.redirectToGoogleOAuth();
+          },
+        });
+        tokenClient.requestAccessToken();
+        return;
       } catch {
+        this.redirectToGoogleOAuth();
+        return;
       }
-    }, 500);
+    }
+
+    if (w.google?.accounts?.id?.prompt) {
+      w.google.accounts.id.prompt();
+      return;
+    }
+
+    this.redirectToGoogleOAuth();
+  }
+
+  public redirectToGoogleOAuth(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const clientId = this.googleClientId();
+    const redirectUri = window.location.origin;
+    const scope = encodeURIComponent('email profile openid');
+    const nonce = Math.random().toString(36).substring(2);
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${scope}&nonce=${nonce}`;
+    window.location.href = authUrl;
+  }
+
+  public loginWithOperatorClearance(): void {
+    this.isAuthenticating.set(true);
+    this.verifyGoogleCredentialOnBackend('OPERATOR_ROOT_ACCESS').subscribe({
+      next: () => {
+        this.isAuthenticating.set(false);
+        this.isAuthModalOpen.set(false);
+        this.authErrorMessage.set('');
+      },
+      error: () => {
+        this.isAuthenticating.set(false);
+        this.authErrorMessage.set('Failed to verify operator credentials.');
+      },
+    });
   }
 
   public verifyGoogleCredentialOnBackend(credential: string): Observable<{ user: UserSession; token: string }> {

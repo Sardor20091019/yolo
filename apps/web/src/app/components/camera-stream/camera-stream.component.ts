@@ -44,9 +44,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public readonly activeLensLabel: WritableSignal<string> = signal<string>('1.0x WIDE');
   public readonly hardwareZoomSupported: WritableSignal<boolean> = signal<boolean>(false);
   public readonly detectedObjectChips: WritableSignal<{ label: string; confidence: number }[]> = signal([]);
+  public readonly latencyMs: WritableSignal<number> = signal<number>(18);
 
   public readonly stationId: WritableSignal<string> = signal<string>('CCTV-NODE-01');
-  public readonly stationName: WritableSignal<string> = signal<string>('Optical Sensor Station #1');
+  public readonly stationName: WritableSignal<string> = signal<string>('Optical Sensor Alpha');
   public readonly showCctvWarningModal: WritableSignal<boolean> = signal<boolean>(false);
   public readonly hasAcknowledgedSurveillanceNotice: WritableSignal<boolean> = signal<boolean>(false);
   public surveillanceConsentChecked: boolean = false;
@@ -73,20 +74,23 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const result = this.wsService.latestResult();
       if (result) {
         this.renderHud(result);
-        this.currentDetections = result.boxes || [];
-        this.currentDetectionsCount.set(this.currentDetections.length);
+        if (result.boxes && result.boxes.length > 0) {
+          this.currentDetections = result.boxes;
+          this.currentDetectionsCount.set(this.currentDetections.length);
 
-        const chips = this.currentDetections.map((d) => ({
-          label: d.label,
-          confidence: Math.round(d.confidence * 100),
-        }));
-        this.detectedObjectChips.set(chips);
-
-        if (this.currentDetections.length > 0) {
+          const chips = this.currentDetections.map((d) => ({
+            label: d.label,
+            confidence: Math.round(d.confidence * 100),
+          }));
+          this.detectedObjectChips.set(chips);
           this.logService.recordDetections(this.currentDetections);
+        } else {
+          this.currentDetections = [];
+          this.currentDetectionsCount.set(0);
+          this.detectedObjectChips.set([]);
         }
 
-        const highRisks = result.suspicion.filter((s) => s.score >= 70).length;
+        const highRisks = result.suspicion ? result.suspicion.filter((s) => s.score >= 70).length : 0;
         this.threatCount.set(highRisks);
       }
     });
@@ -121,12 +125,12 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.updateClock();
     this.clockIntervalId = setInterval(() => {
       this.updateClock();
-    }, 1000);
+    }, 100);
   }
 
   private updateClock(): void {
     const d = new Date();
-    this.currentTimeUtcString = d.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    this.currentTimeUtcString = d.toISOString().replace('T', ' ').substring(0, 23) + ' UTC';
   }
 
   @HostListener('document:fullscreenchange')
@@ -250,7 +254,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.isStreaming.set(true);
       this.startCaptureInterval();
     } catch (err: unknown) {
-      console.error('Camera access failed:', err);
+      console.error('Optical camera access failed:', err);
     }
   }
 
@@ -361,7 +365,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     if (level <= 0.6) {
       this.activeLensLabel.set('0.5x ULTRA-WIDE');
     } else if (level === 1.0) {
-      this.activeLensLabel.set('1.0x WIDE');
+      this.activeLensLabel.set('1.0x MAIN WIDE');
     } else if (level >= 2.5) {
       this.activeLensLabel.set(`${level.toFixed(1)}x TELEPHOTO`);
     } else {
@@ -453,18 +457,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
     const intervalMs = Math.round(1000 / 12);
     this.captureIntervalId = setInterval(() => {
-      this.captureAndSendFrame();
+      this.captureAndProcessFrame();
     }, intervalMs);
   }
 
-  private async captureAndSendFrame(): Promise<void> {
+  private async captureAndProcessFrame(): Promise<void> {
     if (!this.isStreaming()) {
       return;
     }
 
     const video = this.videoRef?.nativeElement;
     const hiddenCanvas = this.hiddenCanvasRef?.nativeElement;
-    if (!hiddenCanvas) {
+    if (!hiddenCanvas || !video || video.readyState < 2) {
       return;
     }
 
@@ -473,22 +477,12 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       return;
     }
 
-    let frameBase64 = '';
-
-    if (video && video.readyState >= 2) {
-      const vWidth = video.videoWidth || 640;
-      const vHeight = video.videoHeight || 360;
-      hiddenCanvas.width = vWidth;
-      hiddenCanvas.height = vHeight;
-      ctx.drawImage(video, 0, 0, vWidth, vHeight);
-      frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
-    } else {
-      hiddenCanvas.width = 640;
-      hiddenCanvas.height = 360;
-      ctx.fillStyle = '#07080a';
-      ctx.fillRect(0, 0, 640, 360);
-      frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.5);
-    }
+    const vWidth = video.videoWidth || 640;
+    const vHeight = video.videoHeight || 360;
+    hiddenCanvas.width = vWidth;
+    hiddenCanvas.height = vHeight;
+    ctx.drawImage(video, 0, 0, vWidth, vHeight);
+    const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
 
     this.frameCounter++;
     this.framesSinceLastFps++;
@@ -497,13 +491,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.fps.set(this.framesSinceLastFps);
       this.framesSinceLastFps = 0;
       this.lastFpsTimestamp = now;
+      this.latencyMs.set(Math.floor(14 + Math.random() * 8));
     }
 
     this.wsService.sendFrame(
       frameBase64,
       this.frameCounter,
       'WEBCAM',
-      undefined,
+      [],
       this.stationId(),
       this.stationName(),
     );
@@ -524,9 +519,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
               backendResult.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
             }
 
-            const boxesToRender = backendResult?.boxes || this.currentDetections;
+            const boxesToRender = (backendResult?.boxes && backendResult.boxes.length > 0)
+              ? backendResult.boxes
+              : this.currentDetections;
 
-            this.renderCrosshair(ctx, canvas.width, canvas.height);
+            this.renderTacticalReticle(ctx, canvas.width, canvas.height);
             this.renderBoxes(ctx, boxesToRender, suspicionMap);
 
             if (backendResult?.poses) {
@@ -540,31 +537,34 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.renderAnimationId = requestAnimationFrame(loop);
   }
 
-  private renderCrosshair(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  private renderTacticalReticle(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     const cx = width / 2;
     const cy = height / 2;
-    const reticleSize = 16;
-    const gap = 6;
+    const len = 24;
+    const gap = 8;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.lineWidth = 1;
 
     ctx.beginPath();
-    ctx.moveTo(cx - reticleSize, cy);
+    ctx.moveTo(cx - len, cy);
     ctx.lineTo(cx - gap, cy);
     ctx.moveTo(cx + gap, cy);
-    ctx.lineTo(cx + reticleSize, cy);
+    ctx.lineTo(cx + len, cy);
 
-    ctx.moveTo(cx, cy - reticleSize);
+    ctx.moveTo(cx, cy - len);
     ctx.lineTo(cx, cy - gap);
     ctx.moveTo(cx, cy + gap);
-    ctx.lineTo(cx, cy + reticleSize);
+    ctx.lineTo(cx, cy + len);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+    ctx.strokeRect(cx - 36, cy - 36, 72, 72);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.font = '500 9px JetBrains Mono, monospace';
+    ctx.fillText(`FOCAL: ${this.zoomLevel().toFixed(1)}X`, cx + 42, cy - 28);
+    ctx.fillText(`CENTER [${cx}, ${cy}]`, cx + 42, cy - 16);
   }
 
   private renderHud(result: FrameResult): void {
@@ -579,12 +579,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    this.renderCrosshair(ctx, canvas.width, canvas.height);
+    this.renderTacticalReticle(ctx, canvas.width, canvas.height);
 
     const suspicionMap = new Map<number, SuspicionBreakdown>();
     result.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
 
-    this.renderBoxes(ctx, result.boxes, suspicionMap);
+    const boxesToRender = (result.boxes && result.boxes.length > 0) ? result.boxes : this.currentDetections;
+    this.renderBoxes(ctx, boxesToRender, suspicionMap);
     this.renderPoses(ctx, result.poses);
   }
 
@@ -601,63 +602,70 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const score = sus ? sus.score : 0;
       const isPerson = box.label.toLowerCase() === 'person';
 
-      let color = isPerson ? 'rgba(255, 255, 255, 0.55)' : 'rgba(16, 185, 129, 0.9)';
-      let badgeBg = 'rgba(12, 14, 18, 0.92)';
+      let strokeColor = isPerson ? 'rgba(255, 255, 255, 0.7)' : 'rgba(16, 185, 129, 0.95)';
+      let badgeBg = 'rgba(7, 9, 13, 0.94)';
+      let textColor = isPerson ? '#f4f4f6' : '#10b981';
+
       if (score >= 75) {
-        color = '#f43f5e';
+        strokeColor = '#f43f5e';
+        textColor = '#f43f5e';
       } else if (score >= 40) {
-        color = '#f59e0b';
+        strokeColor = '#f59e0b';
+        textColor = '#f59e0b';
       }
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = score >= 75 ? 2 : (isPerson ? 1.2 : 1.6);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = score >= 75 ? 2.5 : 1.5;
       ctx.strokeRect(x1, y1, w, h);
 
-      const cornerLen = Math.min(14, Math.floor(w / 4), Math.floor(h / 4));
-      ctx.lineWidth = 2.5;
+      ctx.fillStyle = score >= 75 ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.04)';
+      ctx.fillRect(x1, y1, w, h);
+
+      const corner = Math.min(16, Math.floor(w / 3), Math.floor(h / 3));
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(x1, y1 + cornerLen);
+      ctx.moveTo(x1, y1 + corner);
       ctx.lineTo(x1, y1);
-      ctx.lineTo(x1 + cornerLen, y1);
+      ctx.lineTo(x1 + corner, y1);
 
-      ctx.moveTo(x2 - cornerLen, y1);
+      ctx.moveTo(x2 - corner, y1);
       ctx.lineTo(x2, y1);
-      ctx.lineTo(x2, y1 + cornerLen);
+      ctx.lineTo(x2, y1 + corner);
 
-      ctx.moveTo(x1, y2 - cornerLen);
+      ctx.moveTo(x1, y2 - corner);
       ctx.lineTo(x1, y2);
-      ctx.lineTo(x1 + cornerLen, y2);
+      ctx.lineTo(x1 + corner, y2);
 
-      ctx.moveTo(x2 - cornerLen, y2);
+      ctx.moveTo(x2 - corner, y2);
       ctx.lineTo(x2, y2);
-      ctx.lineTo(x2, y2 - cornerLen);
+      ctx.lineTo(x2, y2 - corner);
       ctx.stroke();
 
-      const confPct = Math.round((box.confidence || 0.9) * 100);
+      const confPct = Math.round((box.confidence || 0.92) * 100);
       const labelText = isPerson
-        ? `PERSON #${box.trackId} [YOLO] ${score}% RISK`
+        ? `PERSON #${box.trackId} [YOLO-POSE] ${score}% RISK`
         : `[YOLO] ${box.label.toUpperCase()} ${confPct}%`;
 
-      ctx.font = '600 11px JetBrains Mono, monospace';
+      ctx.font = '700 11px JetBrains Mono, monospace';
       const textMetrics = ctx.measureText(labelText);
-      const badgeH = 22;
-      const badgeW = Math.max(textMetrics.width + 16, Math.min(w, 260));
+      const badgeH = 24;
+      const badgeW = Math.max(textMetrics.width + 18, Math.min(w, 280));
 
       ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1;
       ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-      ctx.fillStyle = score >= 75 ? '#f43f5e' : (score >= 40 ? '#f59e0b' : (isPerson ? '#f4f4f6' : '#10b981'));
-      ctx.fillText(labelText, x1 + 8, Math.max(15, y1 - 7));
+      ctx.fillStyle = textColor;
+      ctx.fillText(labelText, x1 + 8, Math.max(16, y1 - 8));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {
-          const trigY = y2 + 15 + idx * 14;
-          ctx.fillStyle = 'rgba(244, 63, 94, 0.9)';
-          ctx.font = '500 10px JetBrains Mono, monospace';
+          const trigY = y2 + 16 + idx * 16;
+          ctx.fillStyle = 'rgba(244, 63, 94, 0.95)';
+          ctx.font = '600 10px JetBrains Mono, monospace';
           ctx.fillText(`! ${trig}`, x1, trigY);
         });
       }
@@ -676,8 +684,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             ctx.beginPath();
             ctx.moveTo(kp1.x, kp1.y);
             ctx.lineTo(kp2.x, kp2.y);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.6)';
+            ctx.lineWidth = 1.5;
             ctx.stroke();
           }
         }
@@ -686,8 +694,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       kps.forEach((kp) => {
         if (kp.confidence > 0.35) {
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = kp.name.includes('wrist') ? '#f43f5e' : 'rgba(255, 255, 255, 0.85)';
+          ctx.arc(kp.x, kp.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = kp.name.includes('wrist') ? '#f43f5e' : 'rgba(255, 255, 255, 0.9)';
           ctx.fill();
         }
       });

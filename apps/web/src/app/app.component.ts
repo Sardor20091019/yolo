@@ -24,7 +24,8 @@ import { AuthService } from './services/auth.service';
   templateUrl: './app.component.html',
 })
 export class AppComponent implements AfterViewInit {
-  @ViewChild('googleButtonContainer') public googleBtnRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('headerGoogleBtn') public headerGoogleBtnRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('modalGoogleBtn') public modalGoogleBtnRef?: ElementRef<HTMLDivElement>;
 
   public readonly activeTab: WritableSignal<'feed' | 'admin' | 'logs' | 'alerts'> = signal<'feed' | 'admin' | 'logs' | 'alerts'>('feed');
 
@@ -36,8 +37,8 @@ export class AppComponent implements AfterViewInit {
   ) {}
 
   public ngAfterViewInit(): void {
-    if (this.googleBtnRef?.nativeElement) {
-      this.authService.renderGoogleButton(this.googleBtnRef.nativeElement);
+    if (this.headerGoogleBtnRef?.nativeElement) {
+      this.authService.renderGoogleButton(this.headerGoogleBtnRef.nativeElement);
     }
   }
 
@@ -45,7 +46,24 @@ export class AppComponent implements AfterViewInit {
     this.activeTab.set(tab);
   }
 
+  public openLoginModal(): void {
+    this.authService.openAuthModal();
+    setTimeout(() => {
+      if (this.modalGoogleBtnRef?.nativeElement) {
+        this.authService.renderGoogleButton(this.modalGoogleBtnRef.nativeElement);
+      }
+    }, 150);
+  }
+
   public triggerGoogleSignIn(): void {
     this.authService.triggerGoogleOAuth();
+  }
+
+  public triggerDirectGoogleRedirect(): void {
+    this.authService.redirectToGoogleOAuth();
+  }
+
+  public triggerOperatorQuickAccess(): void {
+    this.authService.loginWithOperatorClearance();
   }
 }

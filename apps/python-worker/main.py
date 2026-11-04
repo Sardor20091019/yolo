@@ -1,5 +1,8 @@
 import sys
 import os
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 import json
 import argparse
 import asyncio
@@ -63,34 +66,46 @@ async def handle_ws_client(websocket, detector: YoloShopliftingDetector) -> None
                 calibration=calibration
             )
 
-            await websocket.send(json.dumps({
+            response = {
                 'requestId': req_id,
                 'result': result
-            }))
+            }
+            await websocket.send(json.dumps(response))
         except Exception as exc:
-            await websocket.send(json.dumps({
-                'error': str(exc)
-            }))
+            err_resp = {
+                'requestId': 0,
+                'error': str(exc),
+                'result': {
+                    'frameIndex': 0,
+                    'boxes': [],
+                    'poses': [],
+                    'suspicion': [],
+                    'alertTriggered': False
+                }
+            }
+            await websocket.send(json.dumps(err_resp))
 
-async def run_websocket_server(detector: YoloShopliftingDetector, host: str, port: int) -> None:
+def run_ws_server(detector: YoloShopliftingDetector, host: str, port: int) -> None:
     try:
         import websockets
-        async with websockets.serve(lambda ws: handle_ws_client(ws, detector), host, port):
-            sys.stderr.write(f'Python YOLO worker listening on ws://{host}:{port}\n')
-            await asyncio.Future()
+        async def main():
+            async with websockets.serve(lambda ws: handle_ws_client(ws, detector), host, port):
+                sys.stderr.write(f"Python YOLO Worker WebSocket server running on ws://{host}:{port}\n")
+                await asyncio.Future()
+        asyncio.run(main())
     except ImportError:
-        sys.stderr.write('websockets module not installed, switching to IPC mode.\n')
+        sys.stderr.write("websockets package not installed, falling back to IPC mode\n")
         run_ipc_loop(detector)
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--detection-model', default=os.getenv('YOLO_DETECTION_MODEL', 'yolo26m.pt'))
-    parser.add_argument('--detection-fallback', default=os.getenv('YOLO_DETECTION_FALLBACK_MODEL', 'yolo11m.pt'))
-    parser.add_argument('--pose-model', default=os.getenv('YOLO_POSE_MODEL', 'yolo26m-pose.pt'))
-    parser.add_argument('--pose-fallback', default=os.getenv('YOLO_POSE_FALLBACK_MODEL', 'yolo11m-pose.pt'))
-    parser.add_argument('--mode', default=os.getenv('PYTHON_WORKER_MODE', 'ipc'))
-    parser.add_argument('--host', default=os.getenv('PYTHON_WORKER_HOST', '127.0.0.1'))
-    parser.add_argument('--port', type=int, default=int(os.getenv('PYTHON_WORKER_PORT', '5001')))
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Shoplifting YOLO Detection Worker')
+    parser.add_argument('--detection-model', type=str, default='yolo11n.pt')
+    parser.add_argument('--detection-fallback', type=str, default='yolo11n.pt')
+    parser.add_argument('--pose-model', type=str, default='yolo11n-pose.pt')
+    parser.add_argument('--pose-fallback', type=str, default='yolo11n-pose.pt')
+    parser.add_argument('--mode', type=str, choices=['ipc', 'ws'], default='ipc')
+    parser.add_argument('--host', type=str, default='127.0.0.1')
+    parser.add_argument('--port', type=int, default=5001)
 
     args = parser.parse_args()
 
@@ -101,11 +116,7 @@ def main() -> None:
         pose_fallback_path=args.pose_fallback
     )
 
-    if args.mode.lower() == 'websocket':
-        asyncio.run(run_websocket_server(detector, args.host, args.port))
+    if args.mode == 'ws':
+        run_ws_server(detector, args.host, args.port)
     else:
         run_ipc_loop(detector)
-
-if __name__ == '__main__':
-    main()
-

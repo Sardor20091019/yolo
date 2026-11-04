@@ -1,5 +1,8 @@
 import sys
 import os
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 import base64
 import time
 import math
@@ -65,10 +68,10 @@ MAP_COCO_TO_RETAIL = {
 class YoloShopliftingDetector:
     def __init__(
         self,
-        detection_model_path: str = 'yolo26m.pt',
-        detection_fallback_path: str = 'yolo11m.pt',
-        pose_model_path: str = 'yolo26m-pose.pt',
-        pose_fallback_path: str = 'yolo11m-pose.pt'
+        detection_model_path: str = 'yolo11n.pt',
+        detection_fallback_path: str = 'yolo11n.pt',
+        pose_model_path: str = 'yolo11n-pose.pt',
+        pose_fallback_path: str = 'yolo11n-pose.pt'
     ):
         self.heuristics = ShopliftingHeuristicsEngine()
         self.detection_model = None
@@ -199,86 +202,90 @@ class YoloShopliftingDetector:
         suspicion_out: List[Dict[str, Any]] = []
         detected_items: List[Dict[str, Any]] = []
 
-        det_results = self.detection_model.track(
-            source=image,
-            conf=conf_thresh,
-            persist=True,
-            tracker='bytetrack.yaml',
-            verbose=False
-        )
+        has_person = False
+        try:
+            det_results = self.detection_model.predict(
+                source=image,
+                conf=conf_thresh,
+                verbose=False
+            )
 
-        pose_results = self.pose_model.track(
-            source=image,
-            conf=conf_thresh,
-            persist=True,
-            tracker='bytetrack.yaml',
-            verbose=False
-        )
+            for r in det_results:
+                boxes = r.boxes
+                if boxes is None:
+                    continue
+                for i in range(len(boxes)):
+                    xyxy = boxes.xyxy[i].cpu().numpy().tolist()
+                    cls_id = int(boxes.cls[i].item())
+                    conf = float(boxes.conf[i].item())
+                    raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}').lower()
+                    track_id = int(boxes.id[i].item()) if boxes.id is not None and boxes.id[i] is not None else (i + 1)
 
-        for r in det_results:
-            boxes = r.boxes
-            if boxes is None:
-                continue
-            for i in range(len(boxes)):
-                xyxy = boxes.xyxy[i].cpu().numpy().tolist()
-                cls_id = int(boxes.cls[i].item())
-                conf = float(boxes.conf[i].item())
-                raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}')
-                track_id = int(boxes.id[i].item()) if boxes.id is not None and boxes.id[i] is not None else (i + 1)
-                
-                if raw_label in MAP_COCO_TO_RETAIL:
-                    label = MAP_COCO_TO_RETAIL[raw_label]
-                elif raw_label != 'person':
-                    label = TEST_OBJECT_CATALOG[track_id % len(TEST_OBJECT_CATALOG)]
-                else:
-                    label = 'person'
+                    if raw_label in MAP_COCO_TO_RETAIL:
+                        label = MAP_COCO_TO_RETAIL[raw_label]
+                    elif raw_label != 'person':
+                        label = raw_label
+                    else:
+                        label = 'person'
+                        has_person = True
 
-                item_info = {
-                    'trackId': track_id,
-                    'label': label,
-                    'confidence': round(conf, 2),
-                    'bbox': [round(x, 1) for x in xyxy]
-                }
-                boxes_out.append(item_info)
-                if label != 'person':
-                    detected_items.append(item_info)
+                    item_info = {
+                        'trackId': track_id,
+                        'label': label,
+                        'confidence': round(conf, 2),
+                        'bbox': [round(x, 1) for x in xyxy]
+                    }
+                    boxes_out.append(item_info)
+                    if label != 'person':
+                        detected_items.append(item_info)
+        except Exception:
+            pass
 
-        for pr in pose_results:
-            p_boxes = pr.boxes
-            p_keypoints = pr.keypoints
-            if p_boxes is None or p_keypoints is None:
-                continue
-
-            for i in range(len(p_boxes)):
-                p_track_id = int(p_boxes.id[i].item()) if p_boxes.id is not None and p_boxes.id[i] is not None else (i + 1)
-                pxyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
-                kp_data = p_keypoints.data[i].cpu().numpy()
-
-                formatted_kps = []
-                for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
-                    kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
-                    formatted_kps.append({
-                        'x': round(kx, 1),
-                        'y': round(ky, 1),
-                        'confidence': round(kc, 2),
-                        'name': KEYPOINT_NAMES[k_idx]
-                    })
-
-                poses_out.append({
-                    'trackId': p_track_id,
-                    'keypoints': formatted_kps,
-                    'skeleton': SKELETON_PAIRS
-                })
-
-                sus_result = self.heuristics.evaluate_person(
-                    p_track_id,
-                    tuple(pxyxy),
-                    formatted_kps,
-                    detected_items,
-                    zones,
-                    calibration
+        if has_person and self.pose_model is not None:
+            try:
+                pose_results = self.pose_model.predict(
+                    source=image,
+                    conf=conf_thresh,
+                    verbose=False
                 )
-                suspicion_out.append(sus_result)
+                for pr in pose_results:
+                    p_boxes = pr.boxes
+                    p_keypoints = pr.keypoints
+                    if p_boxes is None or p_keypoints is None:
+                        continue
+
+                    for i in range(len(p_boxes)):
+                        p_track_id = int(p_boxes.id[i].item()) if p_boxes.id is not None and p_boxes.id[i] is not None else (i + 1)
+                        pxyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
+                        kp_data = p_keypoints.data[i].cpu().numpy()
+
+                        formatted_kps = []
+                        for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
+                            kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
+                            formatted_kps.append({
+                                'x': round(kx, 1),
+                                'y': round(ky, 1),
+                                'confidence': round(kc, 2),
+                                'name': KEYPOINT_NAMES[k_idx]
+                            })
+
+                        poses_out.append({
+                            'trackId': p_track_id,
+                            'keypoints': formatted_kps,
+                            'skeleton': SKELETON_PAIRS
+                        })
+
+                        sus_result = self.heuristics.evaluate_person(
+                            p_track_id,
+                            tuple(pxyxy),
+                            formatted_kps,
+                            detected_items,
+                            zones,
+                            calibration
+                        )
+                        suspicion_out.append(sus_result)
+            except Exception:
+                pass
 
         self.heuristics.cleanup_stale_tracks()
 
