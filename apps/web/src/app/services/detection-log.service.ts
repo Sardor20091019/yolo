@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, WritableSignal, Signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BoundingBox } from '../models/detection.model';
+import { getApiBaseUrl } from './api-config';
 
 export interface UserProfile {
   id: string;
@@ -78,9 +79,7 @@ export class DetectionLogService {
   private lastRecordedTimeByLabel: Map<string, number> = new Map<string, number>();
 
   constructor(private readonly http: HttpClient) {
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
+    this.apiBaseUrl = getApiBaseUrl();
 
     this.restoreLocalCache();
     this.syncUsersFromDatabase();

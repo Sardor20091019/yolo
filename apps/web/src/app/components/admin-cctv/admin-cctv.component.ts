@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { getApiBaseUrl } from '../../services/api-config';
 
 export interface CctvStationRecord {
   stationId: string;
@@ -52,9 +53,7 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
     public readonly authService: AuthService,
     private readonly http: HttpClient,
   ) {
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
+    this.apiBaseUrl = getApiBaseUrl();
   }
 
   public ngOnInit(): void {

@@ -2,6 +2,7 @@ import { Injectable, signal, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { AlertIncident, AlertMetrics } from '../models/alert.model';
+import { getApiBaseUrl } from './api-config';
 
 @Injectable({
   providedIn: 'root',
@@ -18,9 +19,7 @@ export class AlertsService {
   public readonly loading: WritableSignal<boolean> = signal<boolean>(false);
 
   constructor(private readonly http: HttpClient) {
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    this.baseUrl = isDev ? `http://${host}:3000/api/alerts` : '/api/alerts';
+    this.baseUrl = `${getApiBaseUrl()}/alerts`;
   }
 
   public fetchAlerts(status?: string): Observable<AlertIncident[]> {

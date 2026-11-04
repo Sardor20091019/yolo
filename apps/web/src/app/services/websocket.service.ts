@@ -2,6 +2,7 @@ import { Injectable, signal, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
 import { FrameResult, StreamConfig } from '../models/detection.model';
+import { getApiBaseUrl, getSocketUrl } from './api-config';
 
 @Injectable({
   providedIn: 'root',
@@ -17,9 +18,7 @@ export class WebSocketService {
   public readonly alertNotification: WritableSignal<Record<string, unknown> | null> = signal<Record<string, unknown> | null>(null);
 
   constructor(private readonly http: HttpClient) {
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
+    this.apiBaseUrl = getApiBaseUrl();
     this.connect();
   }
 
@@ -28,9 +27,7 @@ export class WebSocketService {
       return;
     }
 
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    const socketUrl = isDev ? `http://${host}:3000` : `${window.location.protocol}//${window.location.host}`;
+    const socketUrl = getSocketUrl();
 
     try {
       this.socket = io(socketUrl, {

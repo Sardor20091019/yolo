@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AlertsService } from '../../services/alerts.service';
 import { WebSocketService } from '../../services/websocket.service';
 import { AlertIncident, AlertDetails } from '../../models/alert.model';
+import { getBackendBaseUrl } from '../../services/api-config';
 
 @Component({
   selector: 'app-alerts-sidebar',
@@ -79,7 +80,6 @@ export class AlertsSidebarComponent implements OnInit {
   public getSnapshotUrl(url: string): string {
     if (!url) return '';
     if (url.startsWith('http') || url.startsWith('data:')) return url;
-    const host = window.location.hostname || 'localhost';
-    return `http://${host}:3000${url}`;
+    return `${getBackendBaseUrl()}${url}`;
   }
 }

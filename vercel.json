@@ -1,40 +1,12 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "api": {
-      "root": "apps/api",
-      "framework": "nestjs",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "python-worker",
-          "format": "url",
-          "env": "PYTHON_WORKER_URL"
-        }
-      ]
-    },
-    "python-worker": {
-      "root": "apps/python-worker",
-      "runtime": "python",
-      "entrypoint": "index.py"
-    },
-    "web": {
-      "root": "apps/web",
-      "framework": "angular"
-    }
-  },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": {
-        "service": "api"
-      }
+      "source": "/api/:match*",
+      "destination": "https://yolo-zt3r.onrender.com/api/:match*"
     },
     {
-      "source": "/(.*)",
-      "destination": {
-        "service": "web"
-      }
+      "source": "/uploads/:match*",
+      "destination": "https://yolo-zt3r.onrender.com/uploads/:match*"
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, WritableSignal, Signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
+import { getApiBaseUrl } from './api-config';
 
 export interface UserSession {
   id: string;
@@ -32,9 +33,7 @@ export class AuthService {
   });
 
   constructor(private readonly http: HttpClient) {
-    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
-    this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
+    this.apiBaseUrl = getApiBaseUrl();
 
     this.restoreSession();
     this.checkForOAuthRedirectToken();
