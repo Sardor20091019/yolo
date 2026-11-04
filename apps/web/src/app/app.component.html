@@ -35,6 +35,19 @@
 
       <button
         type="button"
+        (click)="setMobileTab('logs')"
+        [ngClass]="activeMobileTab() === 'logs' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+        class="flex-1 py-1.5 rounded-lg text-center transition-all relative flex items-center justify-center space-x-1.5">
+        <span>LOGS</span>
+        <span
+          *ngIf="logService.logs().length > 0"
+          class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+          {{ logService.logs().length }}
+        </span>
+      </button>
+
+      <button
+        type="button"
         (click)="setMobileTab('alerts')"
         [ngClass]="activeMobileTab() === 'alerts' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all relative flex items-center justify-center space-x-1.5">
@@ -44,14 +57,6 @@
           class="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/40">
           {{ alertsService.metrics().highRiskCount }}
         </span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setMobileTab('calibration')"
-        [ngClass]="activeMobileTab() === 'calibration' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
-        class="flex-1 py-1.5 rounded-lg text-center transition-all">
-        SETTINGS
       </button>
     </div>
   </div>
@@ -64,7 +69,7 @@
         </div>
 
         <div>
-          <app-calibration-panel></app-calibration-panel>
+          <app-detection-log></app-detection-log>
         </div>
       </div>
 
@@ -78,12 +83,12 @@
         <app-camera-stream></app-camera-stream>
       </div>
 
-      <div *ngIf="activeMobileTab() === 'alerts'" class="min-h-[500px]">
-        <app-alerts-sidebar></app-alerts-sidebar>
+      <div *ngIf="activeMobileTab() === 'logs'">
+        <app-detection-log></app-detection-log>
       </div>
 
-      <div *ngIf="activeMobileTab() === 'calibration'">
-        <app-calibration-panel></app-calibration-panel>
+      <div *ngIf="activeMobileTab() === 'alerts'" class="min-h-[500px]">
+        <app-alerts-sidebar></app-alerts-sidebar>
       </div>
     </div>
   </main>

@@ -1,5 +1,8 @@
-<div class="flex flex-col h-full bg-[#0c0d11] border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3.5 sm:px-5 py-3 sm:py-3.5 bg-[#101216]/60 border-b border-white/[0.06] backdrop-blur gap-2.5">
+<div
+  #cameraContainer
+  [ngClass]="isFullscreen() ? 'fixed inset-0 z-50 rounded-none border-0 w-screen h-screen bg-black' : 'relative flex flex-col h-full bg-[#0c0d11] border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl'">
+  
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3.5 sm:px-5 py-2.5 sm:py-3 bg-[#101216]/80 border-b border-white/[0.06] backdrop-blur gap-2 z-10">
     <div class="flex items-center justify-between sm:justify-start space-x-2.5">
       <div class="flex items-center space-x-2">
         <div class="relative flex items-center justify-center">
@@ -7,7 +10,7 @@
           <span class="absolute w-1.5 h-1.5 rounded-full" [ngClass]="isStreaming() ? 'bg-emerald-400' : 'bg-zinc-500'"></span>
         </div>
         <span class="font-mono text-[11px] font-medium tracking-wider uppercase text-zinc-300">
-          {{ mode() === 'WEBCAM' ? 'OPTICAL FEED' : 'IP FEED' }}
+          OPTICAL FEED
         </span>
         <span *ngIf="isStreaming()" class="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
           LIVE
@@ -18,37 +21,71 @@
         <span class="text-zinc-500">FPS</span>
         <span class="text-zinc-200 font-semibold">{{ fps() }}</span>
         <span class="text-zinc-700">/</span>
-        <span class="text-zinc-500">OBJECTS</span>
+        <span class="text-zinc-500">SEEN</span>
         <span class="text-emerald-400 font-semibold">
           {{ currentDetectionsCount() }}
         </span>
       </div>
     </div>
 
-    <div class="flex items-center space-x-2">
-      <div class="flex rounded-lg bg-black/40 p-0.5 border border-white/[0.06]">
+    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div class="flex items-center rounded-lg bg-black/50 p-0.5 border border-white/[0.08] font-mono text-[10px]">
         <button
           type="button"
-          (click)="setMode('WEBCAM')"
-          [ngClass]="mode() === 'WEBCAM' ? 'bg-white/[0.08] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
-          class="px-2.5 py-1 text-[10px] sm:text-[11px] font-mono rounded-md transition-all">
-          CAMERA
+          (click)="setZoom(0.5)"
+          [ngClass]="zoomLevel() <= 0.6 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+          class="px-2 py-0.5 rounded transition-all">
+          0.5x
         </button>
         <button
           type="button"
-          (click)="setMode('IP_CAMERA')"
-          [ngClass]="mode() === 'IP_CAMERA' ? 'bg-white/[0.08] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
-          class="px-2.5 py-1 text-[10px] sm:text-[11px] font-mono rounded-md transition-all">
-          IP FEED
+          (click)="setZoom(1.0)"
+          [ngClass]="zoomLevel() > 0.6 && zoomLevel() < 1.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+          class="px-2 py-0.5 rounded transition-all">
+          1x
+        </button>
+        <button
+          type="button"
+          (click)="setZoom(2.0)"
+          [ngClass]="zoomLevel() >= 1.5 && zoomLevel() < 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+          class="px-2 py-0.5 rounded transition-all">
+          2x
+        </button>
+        <button
+          type="button"
+          (click)="setZoom(3.0)"
+          [ngClass]="zoomLevel() >= 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+          class="px-2 py-0.5 rounded transition-all">
+          3x
         </button>
       </div>
 
+      <div class="flex items-center space-x-1">
+        <button
+          type="button"
+          (click)="zoomOut()"
+          class="w-6 h-6 flex items-center justify-center rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] text-xs font-mono transition-colors"
+          title="Zoom out">
+          -
+        </button>
+        <button
+          type="button"
+          (click)="zoomIn()"
+          class="w-6 h-6 flex items-center justify-center rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] text-xs font-mono transition-colors"
+          title="Zoom in">
+          +
+        </button>
+      </div>
+
+      <span class="hidden md:inline-block px-2 py-0.5 rounded text-[9px] font-mono text-zinc-400 bg-white/[0.03] border border-white/[0.06]">
+        {{ activeLensLabel() }}
+      </span>
+
       <button
-        *ngIf="mode() === 'WEBCAM'"
         type="button"
         (click)="toggleCameraFacing()"
         class="flex items-center space-x-1 px-2.5 py-1 text-[10px] sm:text-[11px] font-mono rounded-md bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-200 transition-colors"
-        title="Flip Camera">
+        title="Flip Camera Lens">
         <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
         </svg>
@@ -57,93 +94,124 @@
 
       <button
         type="button"
+        (click)="toggleFullscreen()"
+        class="flex items-center space-x-1 px-2.5 py-1 text-[10px] sm:text-[11px] font-mono rounded-md bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-200 transition-colors"
+        title="Toggle Fullscreen">
+        <svg *ngIf="!isFullscreen()" class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+        </svg>
+        <svg *ngIf="isFullscreen()" class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 9L4 4m5 5H4m5 0V4m6 5l5-5m-5 5h5m-5 0V4m-6 11l-5 5m5-5H4m5 0v5m6-5l5 5m-5-5h5m-5 0v5"></path>
+        </svg>
+        <span>{{ isFullscreen() ? 'EXIT' : 'FULL' }}</span>
+      </button>
+
+      <button
+        type="button"
         (click)="toggleStream()"
-        [ngClass]="isStreaming() ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25' : 'bg-white text-zinc-900 hover:bg-zinc-200 border-transparent shadow-sm'"
-        class="flex-1 sm:flex-initial px-3.5 py-1.5 text-xs font-mono font-medium rounded-lg border transition-all text-center">
+        [ngClass]="isStreaming() ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25' : 'bg-white text-zinc-950 hover:bg-zinc-200 border-transparent shadow-sm'"
+        class="px-3.5 py-1 text-xs font-mono font-medium rounded-lg border transition-all text-center">
         {{ isStreaming() ? 'STOP' : 'START' }}
       </button>
     </div>
   </div>
 
-  <div *ngIf="mode() === 'IP_CAMERA'" class="flex items-center space-x-2 px-3.5 sm:px-5 py-2 bg-[#090a0d] border-b border-white/[0.06]">
-    <span class="text-[11px] font-mono text-zinc-400">URL:</span>
-    <input
-      type="text"
-      [ngModel]="ipStreamUrl()"
-      (ngModelChange)="ipStreamUrl.set($event)"
-      placeholder="http://192.168.1.100:8080/video"
-      class="flex-1 bg-black/40 border border-white/[0.08] rounded-lg px-2.5 py-1 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30 transition-colors" />
-  </div>
-
-  <div class="relative flex-1 bg-[#060709] flex items-center justify-center overflow-hidden min-h-[300px] sm:min-h-[400px]">
-    <video
-      #videoElement
-      autoplay
-      playsinline
-      webkit-playsinline
-      muted
-      class="w-full h-full object-contain"
-      [ngClass]="mode() === 'WEBCAM' ? 'block' : 'hidden'">
-    </video>
-
-    <div *ngIf="mode() === 'IP_CAMERA' && isStreaming()" class="w-full h-full flex items-center justify-center bg-[#07080a] p-4 text-center">
-      <div class="font-mono text-xs text-zinc-500">
-        <div class="text-zinc-300 mb-2 font-medium">[ STREAMING IP FEED ]</div>
-        <div class="text-zinc-600 text-[11px] truncate max-w-xs">{{ ipStreamUrl() || 'Awaiting IP Video Stream' }}</div>
-      </div>
+  <div class="relative flex-1 bg-[#060709] flex items-center justify-center overflow-hidden min-h-[320px] sm:min-h-[420px]">
+    <div
+      class="w-full h-full flex items-center justify-center transition-transform duration-200 origin-center"
+      [style.transform]="'scale(' + zoomLevel() + ')'">
+      <video
+        #videoElement
+        autoplay
+        playsinline
+        webkit-playsinline
+        muted
+        class="w-full h-full object-contain">
+      </video>
     </div>
 
-    <div *ngIf="!isStreaming()" class="absolute inset-0 flex flex-col items-center justify-center bg-[#07080a] text-zinc-500 p-4 text-center">
-      <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center mb-2.5">
+    <div *ngIf="!isStreaming()" class="absolute inset-0 flex flex-col items-center justify-center bg-[#07080a] text-zinc-500 p-4 text-center z-10">
+      <div class="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-3">
         <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
         </svg>
       </div>
-      <span class="font-mono text-[11px] sm:text-xs uppercase tracking-wider text-zinc-400">STANDBY</span>
-      <span class="text-[10px] sm:text-[11px] text-zinc-600 mt-1">Press "START" to activate camera detection</span>
+      <span class="font-mono text-xs uppercase tracking-wider text-zinc-300">OPTICAL CAMERA STANDBY</span>
+      <span class="text-[11px] text-zinc-600 mt-1">Tap START to enable camera object detection and logging</span>
     </div>
 
     <canvas
       #hudCanvas
       width="1280"
       height="720"
-      (click)="handleCanvasClick($event)"
-      class="absolute inset-0 w-full h-full object-contain pointer-events-auto cursor-crosshair">
+      class="absolute inset-0 w-full h-full object-contain pointer-events-none transition-transform duration-200 origin-center"
+      [style.transform]="'scale(' + zoomLevel() + ')'">
     </canvas>
 
     <canvas #hiddenCanvas class="hidden"></canvas>
 
-    <div class="absolute bottom-3 left-3 right-3 sm:right-auto flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        (click)="toggleDrawZone()"
-        [ngClass]="isDrawingZone() ? 'bg-amber-400 text-zinc-950 font-semibold' : 'bg-black/60 hover:bg-black/80 text-zinc-300 border border-white/[0.1]'"
-        class="px-2.5 py-1 text-[10px] sm:text-[11px] font-mono rounded-lg backdrop-blur-md transition-all shadow-lg">
-        {{ isDrawingZone() ? 'DONE' : '+ DEFINE ZONE' }}
-      </button>
+    <div
+      *ngIf="isStreaming() && detectedObjectChips().length > 0"
+      class="absolute top-3 left-3 right-3 flex flex-wrap gap-1.5 pointer-events-none z-20">
+      <div
+        *ngFor="let chip of detectedObjectChips()"
+        class="px-2.5 py-1 rounded-lg bg-black/70 border border-emerald-500/30 backdrop-blur-md flex items-center space-x-1.5 shadow-lg">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-mono text-[11px] uppercase font-semibold text-zinc-100">
+          {{ chip.label }}
+        </span>
+        <span class="font-mono text-[10px] text-emerald-400">
+          {{ chip.confidence }}%
+        </span>
+      </div>
+    </div>
 
-      <div *ngIf="isDrawingZone()" class="flex flex-wrap items-center gap-1.5 bg-[#0e1014]/90 p-1.5 rounded-xl border border-white/[0.1] backdrop-blur-md shadow-2xl">
-        <input
-          type="text"
-          [(ngModel)]="newZoneName"
-          placeholder="Name"
-          class="bg-black/50 border border-white/[0.08] rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] font-mono text-zinc-200 w-24 sm:w-32 focus:outline-none focus:border-white/30" />
-        <input
-          type="number"
-          [(ngModel)]="newZoneDwell"
-          placeholder="Dwell (s)"
-          class="bg-black/50 border border-white/[0.08] rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] font-mono text-zinc-200 w-16 focus:outline-none focus:border-white/30" />
+    <div
+      *ngIf="isFullscreen()"
+      class="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-auto z-30">
+      <div class="flex items-center space-x-1.5 bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/[0.1]">
         <button
           type="button"
-          (click)="saveDrawnZone()"
-          class="bg-white text-zinc-950 font-medium px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-mono hover:bg-zinc-200 transition-colors">
-          SAVE
+          (click)="setZoom(0.5)"
+          [ngClass]="zoomLevel() <= 0.6 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
+          class="px-2.5 py-1 text-xs font-mono rounded-lg">
+          0.5x
         </button>
         <button
           type="button"
-          (click)="cancelDrawZone()"
-          class="bg-white/[0.05] text-zinc-400 hover:text-zinc-200 px-1.5 py-0.5 rounded-md text-[10px] sm:text-[11px] font-mono transition-colors">
-          &times;
+          (click)="setZoom(1.0)"
+          [ngClass]="zoomLevel() > 0.6 && zoomLevel() < 1.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
+          class="px-2.5 py-1 text-xs font-mono rounded-lg">
+          1x
+        </button>
+        <button
+          type="button"
+          (click)="setZoom(2.0)"
+          [ngClass]="zoomLevel() >= 1.5 && zoomLevel() < 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
+          class="px-2.5 py-1 text-xs font-mono rounded-lg">
+          2x
+        </button>
+        <button
+          type="button"
+          (click)="setZoom(3.0)"
+          [ngClass]="zoomLevel() >= 2.5 ? 'bg-white text-zinc-950 font-bold' : 'text-zinc-400 hover:text-white'"
+          class="px-2.5 py-1 text-xs font-mono rounded-lg">
+          3x
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button
+          type="button"
+          (click)="toggleCameraFacing()"
+          class="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/[0.1] text-xs font-mono text-zinc-200">
+          {{ facingMode() === 'environment' ? 'BACK' : 'FRONT' }}
+        </button>
+        <button
+          type="button"
+          (click)="toggleFullscreen()"
+          class="px-3 py-1.5 rounded-xl bg-white text-zinc-950 font-bold text-xs font-mono shadow-lg">
+          EXIT FULL
         </button>
       </div>
     </div>

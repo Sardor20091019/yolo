@@ -7,12 +7,20 @@ import {
   signal,
   effect,
   WritableSignal,
+  HostListener,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WebSocketService } from '../../services/websocket.service';
 import { DetectionApiService } from '../../services/detection.service';
-import { FrameResult, BoundingBox, PoseSkeleton, SuspicionBreakdown, DetectionZone } from '../../models/detection.model';
+import { DetectionLogService } from '../../services/detection-log.service';
+import { FrameResult, BoundingBox, PoseSkeleton, SuspicionBreakdown } from '../../models/detection.model';
+
+interface CameraLensDevice {
+  deviceId: string;
+  label: string;
+  type: 'ultra-wide' | 'wide' | 'telephoto' | 'standard';
+}
 
 @Component({
   selector: 'app-camera-stream',
@@ -21,22 +29,25 @@ import { FrameResult, BoundingBox, PoseSkeleton, SuspicionBreakdown, DetectionZo
   templateUrl: './camera-stream.component.html',
 })
 export class CameraStreamComponent implements OnInit, OnDestroy {
+  @ViewChild('cameraContainer') public containerRef!: ElementRef<HTMLDivElement>;
   @ViewChild('videoElement') public videoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('hudCanvas') public hudCanvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('hiddenCanvas') public hiddenCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   public readonly isStreaming: WritableSignal<boolean> = signal<boolean>(false);
-  public readonly mode: WritableSignal<'WEBCAM' | 'IP_CAMERA'> = signal<'WEBCAM' | 'IP_CAMERA'>('WEBCAM');
-  public readonly ipStreamUrl: WritableSignal<string> = signal<string>('');
+  public readonly isFullscreen: WritableSignal<boolean> = signal<boolean>(false);
   public readonly fps: WritableSignal<number> = signal<number>(0);
   public readonly threatCount: WritableSignal<number> = signal<number>(0);
-  public readonly isDrawingZone: WritableSignal<boolean> = signal<boolean>(false);
-  public readonly activeDrawPoints: WritableSignal<[number, number][]> = signal<[number, number][]>([]);
-  public newZoneName: string = 'Electronics Shelf 1';
-  public newZoneDwell: number = 8;
   public readonly facingMode: WritableSignal<'environment' | 'user'> = signal<'environment' | 'user'>('environment');
   public readonly currentDetectionsCount: WritableSignal<number> = signal<number>(0);
+  public readonly zoomLevel: WritableSignal<number> = signal<number>(1.0);
+  public readonly activeLensLabel: WritableSignal<string> = signal<string>('1.0x WIDE');
+  public readonly hardwareZoomSupported: WritableSignal<boolean> = signal<boolean>(false);
+  public readonly detectedObjectChips: WritableSignal<{ label: string; confidence: number }[]> = signal([]);
+
   public currentDetections: BoundingBox[] = [];
+  public availableLenses: CameraLensDevice[] = [];
+  public activeDeviceId: string = '';
 
   private cocoModel: any = null;
   private isModelLoading: boolean = false;
@@ -51,6 +62,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   constructor(
     public readonly wsService: WebSocketService,
     public readonly detectionApi: DetectionApiService,
+    public readonly logService: DetectionLogService,
   ) {
     effect(() => {
       const result = this.wsService.latestResult();
@@ -63,9 +75,56 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public ngOnInit(): void {
-    this.detectionApi.fetchZones().subscribe();
+    this.enumerateCameraLenses();
     this.loadObjectDetectionModel();
     this.startRenderLoop();
+  }
+
+  @HostListener('document:fullscreenchange')
+  public onFullscreenChange(): void {
+    const isDocFullscreen = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    this.isFullscreen.set(isDocFullscreen);
+  }
+
+  @HostListener('document:webkitfullscreenchange')
+  public onWebkitFullscreenChange(): void {
+    const isDocFullscreen = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    this.isFullscreen.set(isDocFullscreen);
+  }
+
+  public async enumerateCameraLenses(): Promise<void> {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      const lenses: CameraLensDevice[] = [];
+
+      videoInputs.forEach((device, index) => {
+        const label = device.label.toLowerCase();
+        let type: 'ultra-wide' | 'wide' | 'telephoto' | 'standard' = 'standard';
+
+        if (label.includes('ultra') || label.includes('0.5') || label.includes('wide-angle')) {
+          type = 'ultra-wide';
+        } else if (label.includes('tele') || label.includes('2x') || label.includes('3x') || label.includes('zoom')) {
+          type = 'telephoto';
+        } else if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
+          type = 'wide';
+        }
+
+        lenses.push({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${index + 1}`,
+          type,
+        });
+      });
+
+      this.availableLenses = lenses;
+    } catch {
+      this.availableLenses = [];
+    }
   }
 
   private async loadObjectDetectionModel(): Promise<void> {
@@ -102,67 +161,226 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public async startStream(): Promise<void> {
-    if (this.mode() === 'WEBCAM') {
+    try {
+      let stream: MediaStream;
+      const constraints = this.buildCameraConstraints();
+
       try {
-        let stream: MediaStream;
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              facingMode: { exact: this.facingMode() },
+              facingMode: { ideal: this.facingMode() },
               width: { ideal: 1280 },
               height: { ideal: 720 },
             },
             audio: false,
           });
         } catch {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: { ideal: this.facingMode() },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
-              audio: false,
-            });
-          } catch {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-              audio: false,
-            });
-          }
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
         }
-
-        this.mediaStream = stream;
-
-        if (this.videoRef?.nativeElement) {
-          this.videoRef.nativeElement.srcObject = this.mediaStream;
-          await this.videoRef.nativeElement.play();
-        }
-
-        if (!this.cocoModel) {
-          await this.loadObjectDetectionModel();
-        }
-
-        this.isStreaming.set(true);
-        this.startCaptureInterval();
-      } catch (err: unknown) {
-        console.error('Camera access failed:', err);
       }
-    } else {
+
+      this.mediaStream = stream;
+
+      if (this.videoRef?.nativeElement) {
+        this.videoRef.nativeElement.srcObject = this.mediaStream;
+        await this.videoRef.nativeElement.play();
+      }
+
+      await this.enumerateCameraLenses();
+      this.detectTrackCapabilities();
+      await this.applyHardwareZoom(this.zoomLevel());
+
+      if (!this.cocoModel) {
+        await this.loadObjectDetectionModel();
+      }
+
       this.isStreaming.set(true);
       this.startCaptureInterval();
+    } catch (err: unknown) {
+      console.error('Camera access failed:', err);
+    }
+  }
+
+  private buildCameraConstraints(): MediaStreamConstraints {
+    if (this.activeDeviceId) {
+      return {
+        video: {
+          deviceId: { exact: this.activeDeviceId },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      };
+    }
+
+    return {
+      video: {
+        facingMode: { exact: this.facingMode() },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
+    };
+  }
+
+  private detectTrackCapabilities(): void {
+    if (!this.mediaStream) {
+      return;
+    }
+    const track = this.mediaStream.getVideoTracks()[0];
+    if (!track) {
+      return;
+    }
+
+    const caps = track.getCapabilities ? (track.getCapabilities() as any) : null;
+    const settings = track.getSettings ? (track.getSettings() as any) : null;
+
+    if (settings && settings.deviceId) {
+      this.activeDeviceId = settings.deviceId;
+    }
+
+    if (caps && 'zoom' in caps) {
+      this.hardwareZoomSupported.set(true);
+    } else {
+      this.hardwareZoomSupported.set(false);
     }
   }
 
   public async toggleCameraFacing(): Promise<void> {
     const nextFacing = this.facingMode() === 'environment' ? 'user' : 'environment';
     this.facingMode.set(nextFacing);
-    if (this.isStreaming() && this.mode() === 'WEBCAM') {
+    this.activeDeviceId = '';
+    this.zoomLevel.set(1.0);
+    this.updateLensLabel(1.0);
+
+    if (this.isStreaming()) {
       if (this.mediaStream) {
         this.mediaStream.getTracks().forEach((track) => track.stop());
         this.mediaStream = null;
       }
       await this.startStream();
+    }
+  }
+
+  public async setZoom(target: number): Promise<void> {
+    const clamped = Math.max(0.5, Math.min(5.0, Math.round(target * 10) / 10));
+    this.zoomLevel.set(clamped);
+    this.updateLensLabel(clamped);
+
+    if (this.facingMode() === 'environment' && this.availableLenses.length > 1) {
+      if (clamped <= 0.6) {
+        const ultraLens = this.availableLenses.find((l) => l.type === 'ultra-wide');
+        if (ultraLens && ultraLens.deviceId !== this.activeDeviceId) {
+          await this.switchPhysicalLensDevice(ultraLens.deviceId);
+          return;
+        }
+      } else if (clamped >= 2.5) {
+        const teleLens = this.availableLenses.find((l) => l.type === 'telephoto');
+        if (teleLens && teleLens.deviceId !== this.activeDeviceId) {
+          await this.switchPhysicalLensDevice(teleLens.deviceId);
+          return;
+        }
+      } else {
+        const wideLens = this.availableLenses.find((l) => l.type === 'wide');
+        if (wideLens && wideLens.deviceId !== this.activeDeviceId && this.activeDeviceId !== '') {
+          await this.switchPhysicalLensDevice(wideLens.deviceId);
+          return;
+        }
+      }
+    }
+
+    await this.applyHardwareZoom(clamped);
+  }
+
+  public async zoomIn(): Promise<void> {
+    const current = this.zoomLevel();
+    const next = current >= 2.0 ? current + 1.0 : (current >= 1.0 ? current + 0.5 : 1.0);
+    await this.setZoom(next);
+  }
+
+  public async zoomOut(): Promise<void> {
+    const current = this.zoomLevel();
+    const next = current > 2.0 ? current - 1.0 : (current > 1.0 ? 1.0 : 0.5);
+    await this.setZoom(next);
+  }
+
+  private updateLensLabel(level: number): void {
+    if (level <= 0.6) {
+      this.activeLensLabel.set('0.5x ULTRA-WIDE');
+    } else if (level === 1.0) {
+      this.activeLensLabel.set('1.0x WIDE');
+    } else if (level >= 2.5) {
+      this.activeLensLabel.set(`${level.toFixed(1)}x TELEPHOTO`);
+    } else {
+      this.activeLensLabel.set(`${level.toFixed(1)}x OPTICAL`);
+    }
+  }
+
+  private async switchPhysicalLensDevice(deviceId: string): Promise<void> {
+    this.activeDeviceId = deviceId;
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream = null;
+    }
+    await this.startStream();
+  }
+
+  private async applyHardwareZoom(level: number): Promise<void> {
+    if (!this.mediaStream) {
+      return;
+    }
+    const track = this.mediaStream.getVideoTracks()[0];
+    if (!track) {
+      return;
+    }
+
+    const caps = track.getCapabilities ? (track.getCapabilities() as any) : null;
+    if (caps && 'zoom' in caps) {
+      try {
+        const minZ = caps.zoom.min || 1.0;
+        const maxZ = caps.zoom.max || 5.0;
+        const hardwareTarget = Math.max(minZ, Math.min(maxZ, level));
+        await track.applyConstraints({
+          advanced: [{ zoom: hardwareTarget } as any],
+        });
+      } catch {
+        return;
+      }
+    }
+  }
+
+  public async toggleFullscreen(): Promise<void> {
+    const el = this.containerRef?.nativeElement;
+    if (!el) {
+      return;
+    }
+
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      try {
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if ((el as any).webkitRequestFullscreen) {
+          await (el as any).webkitRequestFullscreen();
+        }
+      } catch {
+        this.isFullscreen.set(true);
+      }
+    } else {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      } catch {
+        this.isFullscreen.set(false);
+      }
     }
   }
 
@@ -179,13 +397,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.captureIntervalId = null;
     }
     this.isStreaming.set(false);
-  }
-
-  public setMode(newMode: 'WEBCAM' | 'IP_CAMERA'): void {
-    if (this.isStreaming()) {
-      this.stopStream();
-    }
-    this.mode.set(newMode);
   }
 
   private startCaptureInterval(): void {
@@ -217,7 +428,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
     let frameBase64 = '';
 
-    if (this.mode() === 'WEBCAM' && video && video.readyState >= 2) {
+    if (video && video.readyState >= 2) {
       const vWidth = video.videoWidth || 640;
       const vHeight = video.videoHeight || 360;
       hiddenCanvas.width = vWidth;
@@ -251,7 +462,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
               ] as [number, number, number, number],
             };
           });
+
           this.currentDetectionsCount.set(this.currentDetections.length);
+
+          const chips = this.currentDetections.map((d) => ({
+            label: d.label,
+            confidence: Math.round(d.confidence * 100),
+          }));
+          this.detectedObjectChips.set(chips);
+
+          if (this.currentDetections.length > 0) {
+            this.logService.recordDetections(this.currentDetections);
+          }
         } catch {
         } finally {
           this.isDetecting = false;
@@ -260,7 +482,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     } else {
       hiddenCanvas.width = 640;
       hiddenCanvas.height = 360;
-      ctx.fillStyle = '#0f172a';
+      ctx.fillStyle = '#07080a';
       ctx.fillRect(0, 0, 640, 360);
       frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.5);
     }
@@ -274,7 +496,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.lastFpsTimestamp = now;
     }
 
-    this.wsService.sendFrame(frameBase64, this.frameCounter, this.mode(), this.currentDetections);
+    this.wsService.sendFrame(frameBase64, this.frameCounter, 'WEBCAM', this.currentDetections);
   }
 
   private startRenderLoop(): void {
@@ -285,8 +507,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            this.renderZones(ctx);
-            this.renderActiveDrawing(ctx);
 
             const backendResult = this.wsService.latestResult();
             const suspicionMap = new Map<number, SuspicionBreakdown>();
@@ -298,6 +518,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
               ? this.currentDetections
               : (backendResult?.boxes || []);
 
+            this.renderCrosshair(ctx, canvas.width, canvas.height);
             this.renderBoxes(ctx, boxesToRender, suspicionMap);
 
             if (backendResult?.poses) {
@@ -311,58 +532,31 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.renderAnimationId = requestAnimationFrame(loop);
   }
 
-  public handleCanvasClick(event: MouseEvent): void {
-    if (!this.isDrawingZone()) {
-      return;
-    }
-    const canvas = this.hudCanvasRef?.nativeElement;
-    if (!canvas) {
-      return;
-    }
+  private renderCrosshair(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const cx = width / 2;
+    const cy = height / 2;
+    const reticleSize = 16;
+    const gap = 6;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = Math.round((event.clientX - rect.left) * scaleX);
-    const y = Math.round((event.clientY - rect.top) * scaleY);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
 
-    this.activeDrawPoints.update((pts) => [...pts, [x, y]]);
-  }
+    ctx.beginPath();
+    ctx.moveTo(cx - reticleSize, cy);
+    ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);
+    ctx.lineTo(cx + reticleSize, cy);
 
-  public toggleDrawZone(): void {
-    if (this.isDrawingZone()) {
-      this.isDrawingZone.set(false);
-      this.activeDrawPoints.set([]);
-    } else {
-      this.isDrawingZone.set(true);
-      this.activeDrawPoints.set([]);
-    }
-  }
+    ctx.moveTo(cx, cy - reticleSize);
+    ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);
+    ctx.lineTo(cx, cy + reticleSize);
+    ctx.stroke();
 
-  public saveDrawnZone(): void {
-    const points = this.activeDrawPoints();
-    if (points.length < 3) {
-      return;
-    }
-
-    const newZone: Partial<DetectionZone> = {
-      name: this.newZoneName,
-      polygon_coordinates: JSON.stringify(points),
-      dwell_time_threshold: Number(this.newZoneDwell),
-      is_active: true,
-    };
-
-    this.detectionApi.createZone(newZone).subscribe({
-      next: () => {
-        this.isDrawingZone.set(false);
-        this.activeDrawPoints.set([]);
-      },
-    });
-  }
-
-  public cancelDrawZone(): void {
-    this.isDrawingZone.set(false);
-    this.activeDrawPoints.set([]);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private renderHud(result: FrameResult): void {
@@ -377,68 +571,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    this.renderZones(ctx);
-    this.renderActiveDrawing(ctx);
+    this.renderCrosshair(ctx, canvas.width, canvas.height);
 
     const suspicionMap = new Map<number, SuspicionBreakdown>();
     result.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
 
     this.renderBoxes(ctx, result.boxes, suspicionMap);
     this.renderPoses(ctx, result.poses);
-  }
-
-  private renderZones(ctx: CanvasRenderingContext2D): void {
-    const zones = this.detectionApi.zones();
-    zones.forEach((zone) => {
-      try {
-        const polygon: [number, number][] = JSON.parse(zone.polygon_coordinates || '[]');
-        if (polygon.length < 3) return;
-
-        ctx.beginPath();
-        ctx.moveTo(polygon[0][0], polygon[0][1]);
-        for (let i = 1; i < polygon.length; i++) {
-          ctx.lineTo(polygon[i][0], polygon[i][1]);
-        }
-        ctx.closePath();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-        ctx.fill();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.setLineDash([4, 4]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(244, 244, 246, 0.7)';
-        ctx.font = '10px JetBrains Mono';
-        ctx.fillText(`ZONE: ${zone.name}`, polygon[0][0] + 6, polygon[0][1] + 16);
-      } catch (e) {
-        return;
-      }
-    });
-  }
-
-  private renderActiveDrawing(ctx: CanvasRenderingContext2D): void {
-    const points = this.activeDrawPoints();
-    if (points.length === 0) return;
-
-    ctx.beginPath();
-    ctx.moveTo(points[0][0], points[0][1]);
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i][0], points[i][1]);
-    }
-
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    points.forEach(([px, py]) => {
-      ctx.beginPath();
-      ctx.arc(px, py, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#f59e0b';
-      ctx.fill();
-    });
   }
 
   private renderBoxes(
@@ -454,8 +593,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const score = sus ? sus.score : 0;
       const isPerson = box.label.toLowerCase() === 'person';
 
-      let color = isPerson ? 'rgba(255, 255, 255, 0.45)' : 'rgba(16, 185, 129, 0.85)';
-      let badgeBg = 'rgba(12, 14, 18, 0.9)';
+      let color = isPerson ? 'rgba(255, 255, 255, 0.55)' : 'rgba(16, 185, 129, 0.9)';
+      let badgeBg = 'rgba(12, 14, 18, 0.92)';
       if (score >= 75) {
         color = '#f43f5e';
       } else if (score >= 40) {
@@ -463,10 +602,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       ctx.strokeStyle = color;
-      ctx.lineWidth = score >= 75 ? 2 : (isPerson ? 1.2 : 1.5);
+      ctx.lineWidth = score >= 75 ? 2 : (isPerson ? 1.2 : 1.6);
       ctx.strokeRect(x1, y1, w, h);
 
-      const cornerLen = 10;
+      const cornerLen = Math.min(14, Math.floor(w / 4), Math.floor(h / 4));
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(x1, y1 + cornerLen);
@@ -486,31 +625,31 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.lineTo(x2, y2 - cornerLen);
       ctx.stroke();
 
-      const confPct = Math.round((box.confidence || 0.92) * 100);
+      const confPct = Math.round((box.confidence || 0.9) * 100);
       const labelText = isPerson
         ? `PERSON #${box.trackId} ${score}% RISK`
-        : `[OBJ] ${box.label.toUpperCase()} ${confPct}%`;
+        : `${box.label.toUpperCase()}  ${confPct}%`;
 
-      ctx.font = '500 10px JetBrains Mono';
+      ctx.font = '600 11px JetBrains Mono, monospace';
       const textMetrics = ctx.measureText(labelText);
-      const badgeH = 20;
-      const badgeW = Math.max(textMetrics.width + 14, Math.min(w, 240));
+      const badgeH = 22;
+      const badgeW = Math.max(textMetrics.width + 16, Math.min(w, 260));
 
       ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 1;
       ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
       ctx.fillStyle = score >= 75 ? '#f43f5e' : (score >= 40 ? '#f59e0b' : (isPerson ? '#f4f4f6' : '#10b981'));
-      ctx.fillText(labelText, x1 + 6, Math.max(13, y1 - 6));
+      ctx.fillText(labelText, x1 + 8, Math.max(15, y1 - 7));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {
-          const trigY = y2 + 14 + idx * 14;
+          const trigY = y2 + 15 + idx * 14;
           ctx.fillStyle = 'rgba(244, 63, 94, 0.9)';
-          ctx.font = '500 9px JetBrains Mono';
+          ctx.font = '500 10px JetBrains Mono, monospace';
           ctx.fillText(`! ${trig}`, x1, trigY);
         });
       }
@@ -547,4 +686,3 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     });
   }
 }
-
