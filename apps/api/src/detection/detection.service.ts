@@ -2,6 +2,8 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy, NotFoundException } 
 import { ConfigService } from '@nestjs/config';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as readline from 'readline';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DetectionRepository } from './detection.repository';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateDetectionZoneDto, UpdateDetectionZoneDto } from './dto/detection-zone.dto';
@@ -84,9 +86,31 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     this.stopPythonWorker();
   }
 
+  private resolveWorkerScriptPath(configuredPath: string): string {
+    const candidates = [
+      path.resolve(configuredPath),
+      path.resolve(process.cwd(), configuredPath),
+      path.resolve(process.cwd(), '..', configuredPath),
+      path.resolve(process.cwd(), '../..', configuredPath),
+      path.resolve(__dirname, '../../../../apps/python-worker/main.py'),
+      path.resolve(__dirname, '../../../apps/python-worker/main.py'),
+      path.resolve(__dirname, '../../apps/python-worker/main.py'),
+    ];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return path.resolve(process.cwd(), configuredPath);
+  }
+
   private startPythonWorker(): void {
     const pythonBin = this.configService.get<string>('python.binPath', 'python3');
-    const workerScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
+    const configuredScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
+    const workerScript = this.resolveWorkerScriptPath(configuredScript);
+    const workerDir = path.dirname(workerScript);
     const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo26m.pt');
     const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo26m-pose.pt');
 
@@ -97,9 +121,11 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         '--pose-model', poseModel,
         '--mode', 'ipc',
       ], {
+        cwd: workerDir,
         env: {
           ...process.env,
           PYTHONUNBUFFERED: '1',
+          PYTHONPATH: workerDir,
         },
       });
 

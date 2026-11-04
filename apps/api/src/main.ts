@@ -13,7 +13,12 @@ async function bootstrap(): Promise<void> {
 
   const port = configService.get<number>('port', 3000);
   const corsOrigin = configService.get<string>('corsOrigin', 'http://localhost:4200');
-  const uploadsDir = configService.get<string>('uploadsDir', './uploads');
+  const rawUploadsDir = configService.get<string>('uploadsDir', './uploads');
+  const uploadsDir = path.isAbsolute(rawUploadsDir)
+    ? rawUploadsDir
+    : process.cwd().endsWith('apps/api')
+      ? path.resolve(process.cwd(), '../..', rawUploadsDir)
+      : path.resolve(process.cwd(), rawUploadsDir);
 
   app.enableCors({
     origin: corsOrigin.includes(',') ? corsOrigin.split(',') : corsOrigin,

@@ -15,7 +15,12 @@ export class AlertsService {
     private readonly alertsRepository: AlertsRepository,
     private readonly configService: ConfigService,
   ) {
-    this.snapshotsDir = this.configService.get<string>('snapshotsDir', './uploads/snapshots');
+    const rawSnapshotsDir = this.configService.get<string>('snapshotsDir', './uploads/snapshots');
+    this.snapshotsDir = path.isAbsolute(rawSnapshotsDir)
+      ? rawSnapshotsDir
+      : process.cwd().endsWith('apps/api')
+        ? path.resolve(process.cwd(), '../..', rawSnapshotsDir)
+        : path.resolve(process.cwd(), rawSnapshotsDir);
     this.ensureDirectoryExists(this.snapshotsDir);
   }
 
