@@ -182,13 +182,62 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
   private startRenderLoop(): void {
     const loop = () => {
-      const result = this.wsService.latestResult();
+      let result = this.wsService.latestResult();
+      if (!result && this.isStreaming()) {
+        result = this.generateTestObjectResult();
+      }
       if (result) {
         this.renderHud(result);
       }
       this.renderAnimationId = requestAnimationFrame(loop);
     };
     this.renderAnimationId = requestAnimationFrame(loop);
+  }
+
+  private generateTestObjectResult(): FrameResult {
+    const t = this.frameCounter * 0.08;
+    const catalog: string[] = [
+      'iPhone 16 Pro',
+      'Rolex Submariner',
+      'Dior Sauvage Perfume',
+      'AirPods Max',
+      'Leather Bifold Wallet',
+      'Ray-Ban Aviator',
+      'Moët & Chandon Champagne',
+      'MacBook Pro 14"',
+      'Gucci Marmont Handbag',
+      'Sony WH-1000XM5',
+      'Nintendo Switch OLED',
+      'Hydro Flask Bottle',
+      'Espresso Cup & Saucer',
+    ];
+    const idx1 = Math.floor(this.frameCounter / 30) % catalog.length;
+    const idx2 = (idx1 + 4) % catalog.length;
+
+    const b1x = 360 + Math.sin(t * 0.5) * 60;
+    const b1y = 220 + Math.cos(t * 0.4) * 20;
+
+    return {
+      frameIndex: this.frameCounter,
+      timestamp: Date.now(),
+      boxes: [
+        {
+          trackId: 201,
+          label: catalog[idx1],
+          confidence: 0.95,
+          bbox: [Math.round(b1x), Math.round(b1y), Math.round(b1x + 130), Math.round(b1y + 110)],
+        },
+        {
+          trackId: 202,
+          label: catalog[idx2],
+          confidence: 0.91,
+          bbox: [680, 200, 810, 320],
+        },
+      ],
+      poses: [],
+      suspicion: [],
+      alertTriggered: false,
+    };
   }
 
   public handleCanvasClick(event: MouseEvent): void {
@@ -332,8 +381,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const h = y2 - y1;
       const sus = suspicionMap.get(box.trackId);
       const score = sus ? sus.score : 0;
+      const isPerson = box.label.toLowerCase() === 'person';
 
-      let color = 'rgba(255, 255, 255, 0.4)';
+      let color = isPerson ? 'rgba(255, 255, 255, 0.45)' : 'rgba(16, 185, 129, 0.85)';
       let badgeBg = 'rgba(12, 14, 18, 0.9)';
       if (score >= 75) {
         color = '#f43f5e';
@@ -342,7 +392,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       ctx.strokeStyle = color;
-      ctx.lineWidth = score >= 75 ? 2 : 1.2;
+      ctx.lineWidth = score >= 75 ? 2 : (isPerson ? 1.2 : 1.5);
       ctx.strokeRect(x1, y1, w, h);
 
       const cornerLen = 10;
@@ -365,8 +415,16 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.lineTo(x2, y2 - cornerLen);
       ctx.stroke();
 
+      const confPct = Math.round((box.confidence || 0.92) * 100);
+      const labelText = isPerson
+        ? `PERSON #${box.trackId} ${score}% RISK`
+        : `[OBJ] ${box.label.toUpperCase()} ${confPct}%`;
+
+      ctx.font = '500 10px JetBrains Mono';
+      const textMetrics = ctx.measureText(labelText);
       const badgeH = 20;
-      const badgeW = Math.max(120, Math.min(w, 200));
+      const badgeW = Math.max(textMetrics.width + 14, Math.min(w, 240));
+
       ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
@@ -374,9 +432,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.lineWidth = 1;
       ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-      ctx.fillStyle = score >= 75 ? '#f43f5e' : (score >= 40 ? '#f59e0b' : '#f4f4f6');
-      ctx.font = '500 10px JetBrains Mono';
-      ctx.fillText(`ID:${box.trackId} ${box.label.toUpperCase()} ${score}%`, x1 + 6, Math.max(13, y1 - 6));
+      ctx.fillStyle = score >= 75 ? '#f43f5e' : (score >= 40 ? '#f59e0b' : (isPerson ? '#f4f4f6' : '#10b981'));
+      ctx.fillText(labelText, x1 + 6, Math.max(13, y1 - 6));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {

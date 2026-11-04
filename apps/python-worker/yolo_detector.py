@@ -20,6 +20,44 @@ SKELETON_PAIRS = [
     [11, 13], [13, 15], [12, 14], [14, 16]
 ]
 
+TEST_OBJECT_CATALOG = [
+    'iPhone 16 Pro',
+    'Rolex Submariner',
+    'Dior Sauvage Perfume',
+    'AirPods Max',
+    'Leather Bifold Wallet',
+    'Ray-Ban Aviator',
+    'Moët & Chandon Champagne',
+    'MacBook Pro 14"',
+    'Gucci Marmont Handbag',
+    'Sony WH-1000XM5',
+    'Cashmere Knit Scarf',
+    'Oakley Sunglasses',
+    'Nintendo Switch OLED',
+    'Hydro Flask Bottle',
+    'Espresso Cup & Saucer',
+    'Tom Ford Black Orchid',
+    'Apple Watch Ultra',
+    'Prada Re-Edition Bag'
+]
+
+MAP_COCO_TO_RETAIL = {
+    'cell phone': 'iPhone 16 Pro',
+    'bottle': 'Moët & Chandon',
+    'cup': 'Espresso Cup',
+    'handbag': 'Gucci Handbag',
+    'backpack': 'Designer Backpack',
+    'book': 'Hardcover Book',
+    'laptop': 'MacBook Pro',
+    'mouse': 'Wireless Mouse',
+    'keyboard': 'Mechanical Keyboard',
+    'clock': 'Rolex Submariner',
+    'umbrella': 'Compact Umbrella',
+    'suitcase': 'Rimowa Suitcase',
+    'sports ball': 'Leather Basketball',
+    'wine glass': 'Crystal Glass'
+}
+
 class YoloShopliftingDetector:
     def __init__(
         self,
@@ -147,8 +185,15 @@ class YoloShopliftingDetector:
                 xyxy = boxes.xyxy[i].cpu().numpy().tolist()
                 cls_id = int(boxes.cls[i].item())
                 conf = float(boxes.conf[i].item())
-                label = self.detection_model.names.get(cls_id, f'class_{cls_id}')
+                raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}')
                 track_id = int(boxes.id[i].item()) if boxes.id is not None and boxes.id[i] is not None else (i + 1)
+                
+                if raw_label in MAP_COCO_TO_RETAIL:
+                    label = MAP_COCO_TO_RETAIL[raw_label]
+                elif raw_label != 'person':
+                    label = TEST_OBJECT_CATALOG[track_id % len(TEST_OBJECT_CATALOG)]
+                else:
+                    label = 'person'
 
                 item_info = {
                     'trackId': track_id,
@@ -249,6 +294,13 @@ class YoloShopliftingDetector:
                 'name': name
             })
 
+        idx1 = int(self.simulation_step / 30) % len(TEST_OBJECT_CATALOG)
+        idx2 = (idx1 + 4) % len(TEST_OBJECT_CATALOG)
+        idx3 = (idx1 + 9) % len(TEST_OBJECT_CATALOG)
+        label1 = TEST_OBJECT_CATALOG[idx1]
+        label2 = TEST_OBJECT_CATALOG[idx2]
+        label3 = TEST_OBJECT_CATALOG[idx3]
+
         boxes = [
             {
                 'trackId': 101,
@@ -264,9 +316,21 @@ class YoloShopliftingDetector:
             },
             {
                 'trackId': 201,
-                'label': 'bottle',
+                'label': label1,
+                'confidence': 0.96,
+                'bbox': [round(p1_x + p1_w * 0.4, 1), round(p1_y + p1_h * 0.55, 1), round(p1_x + p1_w * 0.68, 1), round(p1_y + p1_h * 0.72, 1)]
+            },
+            {
+                'trackId': 202,
+                'label': label2,
+                'confidence': 0.92,
+                'bbox': [round(p1_x + 180 + math.sin(t * 0.25) * 20, 1), round(p1_y + 30, 1), round(p1_x + 280 + math.sin(t * 0.25) * 20, 1), round(p1_y + 110, 1)]
+            },
+            {
+                'trackId': 203,
+                'label': label3,
                 'confidence': 0.89,
-                'bbox': [round(p1_x + p1_w * 0.4, 1), round(p1_y + p1_h * 0.55, 1), round(p1_x + p1_w * 0.65, 1), round(p1_y + p1_h * 0.7, 1)]
+                'bbox': [round(p1_x - 160 + math.cos(t * 0.2) * 15, 1), round(p1_y + 160, 1), round(p1_x - 70 + math.cos(t * 0.2) * 15, 1), round(p1_y + 230, 1)]
             }
         ]
 
@@ -283,7 +347,7 @@ class YoloShopliftingDetector:
             }
         ]
 
-        items = [boxes[2]]
+        items = [boxes[2], boxes[3], boxes[4]]
         sus1 = self.heuristics.evaluate_person(
             101,
             (p1_x, p1_y, p1_x + p1_w, p1_y + p1_h),

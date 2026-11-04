@@ -66,6 +66,26 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     nervousCheckSensitivity: 3,
   };
   private lastAlertTimestamps: Map<number, number> = new Map();
+  private readonly testObjectCatalog: string[] = [
+    'iPhone 16 Pro',
+    'Rolex Submariner',
+    'Dior Sauvage Perfume',
+    'AirPods Max',
+    'Leather Bifold Wallet',
+    'Ray-Ban Aviator',
+    'Moët & Chandon Champagne',
+    'MacBook Pro 14"',
+    'Gucci Marmont Handbag',
+    'Sony WH-1000XM5',
+    'Cashmere Knit Scarf',
+    'Oakley Sunglasses',
+    'Nintendo Switch OLED',
+    'Hydro Flask Bottle',
+    'Espresso Cup & Saucer',
+    'Tom Ford Black Orchid',
+    'Apple Watch Ultra',
+    'Prada Re-Edition Bag',
+  ];
 
   constructor(
     private readonly detectionRepository: DetectionRepository,
@@ -326,6 +346,13 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       [11, 13], [13, 15], [12, 14], [14, 16],
     ];
 
+    const itemIdx1 = Math.floor(frameIndex / 30) % this.testObjectCatalog.length;
+    const itemIdx2 = (itemIdx1 + 5) % this.testObjectCatalog.length;
+    const itemIdx3 = (itemIdx1 + 11) % this.testObjectCatalog.length;
+    const label1 = this.testObjectCatalog[itemIdx1];
+    const label2 = this.testObjectCatalog[itemIdx2];
+    const label3 = this.testObjectCatalog[itemIdx3];
+
     const boxes: BoundingBox[] = [
       {
         trackId: 101,
@@ -335,13 +362,35 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       },
       {
         trackId: 201,
-        label: 'bottle',
-        confidence: 0.89,
+        label: label1,
+        confidence: 0.96,
         bbox: [
           Math.round(p1X + p1W * 0.4),
           Math.round(p1Y + p1H * 0.55),
-          Math.round(p1X + p1W * 0.65),
-          Math.round(p1Y + p1H * 0.7),
+          Math.round(p1X + p1W * 0.7),
+          Math.round(p1Y + p1H * 0.72),
+        ],
+      },
+      {
+        trackId: 202,
+        label: label2,
+        confidence: 0.92,
+        bbox: [
+          Math.round(p1X + 180 + Math.sin(t * 0.25) * 20),
+          Math.round(p1Y + 30),
+          Math.round(p1X + 280 + Math.sin(t * 0.25) * 20),
+          Math.round(p1Y + 110),
+        ],
+      },
+      {
+        trackId: 203,
+        label: label3,
+        confidence: 0.89,
+        bbox: [
+          Math.round(p1X - 160 + Math.cos(t * 0.2) * 15),
+          Math.round(p1Y + 160),
+          Math.round(p1X - 70 + Math.cos(t * 0.2) * 15),
+          Math.round(p1Y + 230),
         ],
       },
     ];
@@ -359,7 +408,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     const cycle = Math.floor(frameIndex / 20) % 3;
     if (cycle === 1) {
       concealmentScore = 50;
-      triggers.push('Concealment motion into waist/pocket (bottle)');
+      triggers.push(`Concealment motion into waist/pocket (${label1})`);
     }
 
     let loiteringScore = 0;
