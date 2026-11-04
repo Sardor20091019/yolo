@@ -27,6 +27,7 @@ export class DetectionController {
       frameDto.frameData,
       frameDto.frameIndex,
       frameDto.source,
+      frameDto.detectedBoxes,
     );
   }
 

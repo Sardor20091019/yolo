@@ -1,42 +1,24 @@
 <div class="min-h-screen bg-[#08090b] flex flex-col text-[#f4f4f6] font-sans selection:bg-white/20 selection:text-white">
-  <header class="bg-[#0f1115]/85 border-b border-white/[0.08] px-3.5 sm:px-6 py-2.5 sm:py-3.5 backdrop-blur-xl sticky top-0 z-40">
+  <header class="bg-[#0f1115]/85 border-b border-white/[0.08] px-4 sm:px-6 py-3 backdrop-blur-xl sticky top-0 z-40">
     <div class="flex items-center justify-between max-w-7xl mx-auto w-full">
-      <div class="flex items-center space-x-2.5 sm:space-x-3.5">
-        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/[0.04] border border-white/[0.1] flex items-center justify-center text-white shadow-inner">
-          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.1] flex items-center justify-center text-white shadow-inner">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
             <circle cx="12" cy="12" r="3"></circle>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
           </svg>
         </div>
         <div>
-          <div class="flex items-center space-x-2">
-            <span class="text-xs font-semibold tracking-widest uppercase text-white">ARGUS</span>
-            <span class="text-zinc-600">/</span>
-            <span class="text-xs text-zinc-300 font-medium">Vision</span>
-            <span class="text-[9px] sm:text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
-              YOLO26m
-            </span>
-          </div>
-          <p class="hidden sm:block text-[11px] text-zinc-500 font-normal">
-            Autonomous Suspicion Heuristics &bull; Concealment &bull; Rapid Checks &bull; Shelf Loitering
-          </p>
+          <span class="text-sm font-semibold tracking-wide text-white">ASTROVision</span>
         </div>
       </div>
 
-      <div class="flex items-center space-x-2 sm:space-x-3">
-        <div class="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-[11px] font-mono px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-zinc-300">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" [ngClass]="wsService.isConnected() ? 'animate-pulse' : ''"></span>
-          <span class="hidden xs:inline text-zinc-500">FEED</span>
-          <span class="text-zinc-200 font-medium">
-            {{ wsService.isConnected() ? 'ONLINE' : 'HTTP' }}
-          </span>
-        </div>
-
-        <div class="hidden md:flex items-center space-x-2 text-[11px] font-mono px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-zinc-300">
-          <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
-          <span class="text-zinc-500">DB</span>
-          <span class="text-zinc-300">NEON PG</span>
-        </div>
+      <div class="flex items-center space-x-2 text-[11px] font-mono px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-zinc-300">
+        <span class="w-2 h-2 rounded-full" [ngClass]="wsService.isConnected() ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'"></span>
+        <span class="text-zinc-200 font-medium">
+          {{ wsService.isConnected() ? 'CONNECTED' : 'STANDALONE' }}
+        </span>
       </div>
     </div>
   </header>
@@ -48,7 +30,7 @@
         (click)="setMobileTab('feed')"
         [ngClass]="activeMobileTab() === 'feed' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all">
-        FEED
+        CAMERA
       </button>
 
       <button
@@ -69,12 +51,12 @@
         (click)="setMobileTab('calibration')"
         [ngClass]="activeMobileTab() === 'calibration' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all">
-        CALIBRATE
+        SETTINGS
       </button>
     </div>
   </div>
 
-  <main class="flex-1 max-w-7xl mx-auto w-full p-3 sm:p-6">
+  <main class="flex-1 max-w-7xl mx-auto w-full p-3.5 sm:p-6">
     <div class="hidden lg:grid lg:grid-cols-12 gap-6">
       <div class="lg:col-span-8 flex flex-col space-y-6">
         <div class="h-[520px]">
@@ -92,7 +74,7 @@
     </div>
 
     <div class="lg:hidden">
-      <div *ngIf="activeMobileTab() === 'feed'" class="h-[420px] xs:h-[460px] sm:h-[500px]">
+      <div *ngIf="activeMobileTab() === 'feed'" class="h-[440px] xs:h-[480px] sm:h-[520px]">
         <app-camera-stream></app-camera-stream>
       </div>
 
@@ -107,6 +89,6 @@
   </main>
 
   <footer class="border-t border-white/[0.06] bg-[#0b0c0f] px-4 sm:px-6 py-3 text-center text-xs text-zinc-500 font-normal">
-    <span class="font-mono text-zinc-400 text-[11px]">ARGUS VISION SYSTEM</span> &bull; Multi-Object Pose Analysis &bull; Kysely Type-Safe PostgreSQL
+    <span>ASTROVision &bull; Real-Time Optical Detection System</span>
   </footer>
 </div>

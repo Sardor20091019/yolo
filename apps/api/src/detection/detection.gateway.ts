@@ -16,6 +16,12 @@ interface StreamFramePayload {
   frameData: string;
   frameIndex: number;
   source?: 'WEBCAM' | 'IP_CAMERA';
+  detectedBoxes?: Array<{
+    trackId: number;
+    label: string;
+    confidence: number;
+    bbox: [number, number, number, number];
+  }>;
 }
 
 @WebSocketGateway({
@@ -54,6 +60,7 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       payload.frameData,
       payload.frameIndex || 0,
       payload.source || 'WEBCAM',
+      payload.detectedBoxes,
     );
 
     client.emit('detection_results', result);

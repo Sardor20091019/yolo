@@ -35,7 +35,12 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public newZoneName: string = 'Electronics Shelf 1';
   public newZoneDwell: number = 8;
   public readonly facingMode: WritableSignal<'environment' | 'user'> = signal<'environment' | 'user'>('environment');
+  public readonly currentDetectionsCount: WritableSignal<number> = signal<number>(0);
+  public currentDetections: BoundingBox[] = [];
 
+  private cocoModel: any = null;
+  private isModelLoading: boolean = false;
+  private isDetecting: boolean = false;
   private mediaStream: MediaStream | null = null;
   private captureIntervalId: any = null;
   private frameCounter: number = 0;
@@ -59,7 +64,26 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
   public ngOnInit(): void {
     this.detectionApi.fetchZones().subscribe();
+    this.loadObjectDetectionModel();
     this.startRenderLoop();
+  }
+
+  private async loadObjectDetectionModel(): Promise<void> {
+    const w = typeof window !== 'undefined' ? (window as any) : null;
+    if (w && w.cocoSsd) {
+      this.isModelLoading = true;
+      try {
+        this.cocoModel = await w.cocoSsd.load({ base: 'mobilenet_v2' });
+      } catch {
+        try {
+          this.cocoModel = await w.cocoSsd.load();
+        } catch {
+          this.cocoModel = null;
+        }
+      } finally {
+        this.isModelLoading = false;
+      }
+    }
   }
 
   public ngOnDestroy(): void {
@@ -80,26 +104,43 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public async startStream(): Promise<void> {
     if (this.mode() === 'WEBCAM') {
       try {
-        const constraints: MediaStreamConstraints = {
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: { ideal: this.facingMode() },
-          },
-          audio: false,
-        };
+        let stream: MediaStream;
         try {
-          this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch {
-          this.mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: this.facingMode() } },
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { exact: this.facingMode() },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
             audio: false,
           });
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: { ideal: this.facingMode() },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            });
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false,
+            });
+          }
         }
+
+        this.mediaStream = stream;
 
         if (this.videoRef?.nativeElement) {
           this.videoRef.nativeElement.srcObject = this.mediaStream;
           await this.videoRef.nativeElement.play();
+        }
+
+        if (!this.cocoModel) {
+          await this.loadObjectDetectionModel();
         }
 
         this.isStreaming.set(true);
@@ -158,7 +199,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }, intervalMs);
   }
 
-  private captureAndSendFrame(): void {
+  private async captureAndSendFrame(): Promise<void> {
     if (!this.isStreaming()) {
       return;
     }
@@ -177,10 +218,45 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     let frameBase64 = '';
 
     if (this.mode() === 'WEBCAM' && video && video.readyState >= 2) {
-      hiddenCanvas.width = video.videoWidth || 640;
-      hiddenCanvas.height = video.videoHeight || 360;
-      ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+      const vWidth = video.videoWidth || 640;
+      const vHeight = video.videoHeight || 360;
+      hiddenCanvas.width = vWidth;
+      hiddenCanvas.height = vHeight;
+      ctx.drawImage(video, 0, 0, vWidth, vHeight);
       frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
+
+      if (this.cocoModel && !this.isDetecting) {
+        this.isDetecting = true;
+        try {
+          const predictions = await this.cocoModel.detect(video);
+          const scaleX = 1280 / vWidth;
+          const scaleY = 720 / vHeight;
+
+          this.currentDetections = predictions.map((pred: any, idx: number) => {
+            const [bx, by, bw, bh] = pred.bbox;
+            let label = pred.class.toLowerCase();
+            if (label === 'cell phone') label = 'phone';
+            if (label === 'dining table') label = 'desk';
+            if (label === 'couch') label = 'sofa';
+
+            return {
+              trackId: idx + 1,
+              label,
+              confidence: Math.round(pred.score * 100) / 100,
+              bbox: [
+                Math.round(bx * scaleX),
+                Math.round(by * scaleY),
+                Math.round((bx + bw) * scaleX),
+                Math.round((by + bh) * scaleY),
+              ] as [number, number, number, number],
+            };
+          });
+          this.currentDetectionsCount.set(this.currentDetections.length);
+        } catch {
+        } finally {
+          this.isDetecting = false;
+        }
+      }
     } else {
       hiddenCanvas.width = 640;
       hiddenCanvas.height = 360;
@@ -198,74 +274,41 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.lastFpsTimestamp = now;
     }
 
-    this.wsService.sendFrame(frameBase64, this.frameCounter, this.mode());
+    this.wsService.sendFrame(frameBase64, this.frameCounter, this.mode(), this.currentDetections);
   }
 
   private startRenderLoop(): void {
     const loop = () => {
-      let result = this.wsService.latestResult();
-      if (!result && this.isStreaming()) {
-        result = this.generateTestObjectResult();
-      }
-      if (result) {
-        this.renderHud(result);
+      if (this.isStreaming()) {
+        const canvas = this.hudCanvasRef?.nativeElement;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.renderZones(ctx);
+            this.renderActiveDrawing(ctx);
+
+            const backendResult = this.wsService.latestResult();
+            const suspicionMap = new Map<number, SuspicionBreakdown>();
+            if (backendResult?.suspicion) {
+              backendResult.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+            }
+
+            const boxesToRender = this.currentDetections.length > 0
+              ? this.currentDetections
+              : (backendResult?.boxes || []);
+
+            this.renderBoxes(ctx, boxesToRender, suspicionMap);
+
+            if (backendResult?.poses) {
+              this.renderPoses(ctx, backendResult.poses);
+            }
+          }
+        }
       }
       this.renderAnimationId = requestAnimationFrame(loop);
     };
     this.renderAnimationId = requestAnimationFrame(loop);
-  }
-
-  private generateTestObjectResult(): FrameResult {
-    const t = this.frameCounter * 0.08;
-    const catalog: string[] = [
-      'keyboard',
-      'phone',
-      'mouse',
-      'chair',
-      'laptop',
-      'bottle',
-      'cup',
-      'backpack',
-      'book',
-      'watch',
-      'headphones',
-      'wallet',
-      'glasses',
-      'camera',
-      'umbrella',
-      'scissors',
-      'clock',
-      'shoe',
-      'desk',
-      'remote',
-    ];
-    const idx1 = Math.floor(this.frameCounter / 30) % catalog.length;
-    const idx2 = (idx1 + 4) % catalog.length;
-
-    const b1x = 360 + Math.sin(t * 0.5) * 60;
-    const b1y = 220 + Math.cos(t * 0.4) * 20;
-
-    return {
-      frameIndex: this.frameCounter,
-      timestamp: Date.now(),
-      boxes: [
-        {
-          trackId: 201,
-          label: catalog[idx1],
-          confidence: 0.95,
-          bbox: [Math.round(b1x), Math.round(b1y), Math.round(b1x + 130), Math.round(b1y + 110)],
-        },
-        {
-          trackId: 202,
-          label: catalog[idx2],
-          confidence: 0.91,
-          bbox: [680, 200, 810, 320],
-        },
-      ],
-      poses: [],
-      suspicion: [],
-      alertTriggered: false,
-    };
   }
 
   public handleCanvasClick(event: MouseEvent): void {

@@ -64,12 +64,18 @@ export class WebSocketService {
     }
   }
 
-  public sendFrame(frameData: string, frameIndex: number, source: 'WEBCAM' | 'IP_CAMERA'): void {
+  public sendFrame(
+    frameData: string,
+    frameIndex: number,
+    source: 'WEBCAM' | 'IP_CAMERA',
+    detectedBoxes?: any[],
+  ): void {
     if (this.socket && this.isConnected()) {
       this.socket.emit('stream_frame', {
         frameData,
         frameIndex,
         source,
+        detectedBoxes,
       });
       return;
     }
@@ -83,6 +89,7 @@ export class WebSocketService {
       frameData,
       frameIndex,
       source,
+      detectedBoxes,
     }).subscribe({
       next: (result) => {
         this.latestResult.set(result);

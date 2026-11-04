@@ -150,7 +150,14 @@ class YoloShopliftingDetector:
             if image is not None:
                 return self.run_yolo_inference(image, frame_index, zones, calibration, conf_thresh)
 
-        return self.run_simulated_inference(frame_index, zones, calibration)
+        return {
+            'frameIndex': frame_index,
+            'timestamp': int(time.time() * 1000),
+            'boxes': [],
+            'poses': [],
+            'suspicion': [],
+            'alertTriggered': False
+        }
 
     def run_yolo_inference(
         self,
@@ -255,129 +262,5 @@ class YoloShopliftingDetector:
             'poses': poses_out,
             'suspicion': suspicion_out,
             'alertTriggered': any(s['score'] >= float(calibration.get('suspicionThreshold', 75)) for s in suspicion_out)
-        }
-
-    def run_simulated_inference(
-        self,
-        frame_index: int,
-        zones: List[Dict[str, Any]],
-        calibration: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        self.simulation_step += 1
-        t = self.simulation_step * 0.1
-
-        p1_x = 220 + math.sin(t * 0.5) * 80
-        p1_y = 120 + math.cos(t * 0.3) * 30
-        p1_w, p1_h = 130, 310
-
-        p1_kps = []
-        for idx, name in enumerate(KEYPOINT_NAMES):
-            kx = p1_x + (p1_w * 0.5) + math.sin(t + idx) * 15
-            ky = p1_y + (p1_h * (idx / len(KEYPOINT_NAMES)))
-            if name == 'right_wrist':
-                cycle = int(self.simulation_step / 20) % 3
-                if cycle == 1:
-                    kx = p1_x + p1_w * 0.5
-                    ky = p1_y + p1_h * 0.62
-            p1_kps.append({
-                'x': round(kx, 1),
-                'y': round(ky, 1),
-                'confidence': 0.88,
-                'name': name
-            })
-
-        p2_x = 480 + math.cos(t * 0.4) * 40
-        p2_y = 140
-        p2_w, p2_h = 120, 300
-        p2_kps = []
-        for idx, name in enumerate(KEYPOINT_NAMES):
-            p2_kps.append({
-                'x': round(p2_x + p2_w * 0.5 + math.cos(t + idx) * 10, 1),
-                'y': round(p2_y + p2_h * (idx / len(KEYPOINT_NAMES)), 1),
-                'confidence': 0.85,
-                'name': name
-            })
-
-        idx1 = int(self.simulation_step / 30) % len(TEST_OBJECT_CATALOG)
-        idx2 = (idx1 + 4) % len(TEST_OBJECT_CATALOG)
-        idx3 = (idx1 + 9) % len(TEST_OBJECT_CATALOG)
-        label1 = TEST_OBJECT_CATALOG[idx1]
-        label2 = TEST_OBJECT_CATALOG[idx2]
-        label3 = TEST_OBJECT_CATALOG[idx3]
-
-        boxes = [
-            {
-                'trackId': 101,
-                'label': 'person',
-                'confidence': 0.94,
-                'bbox': [round(p1_x, 1), round(p1_y, 1), round(p1_x + p1_w, 1), round(p1_y + p1_h, 1)]
-            },
-            {
-                'trackId': 102,
-                'label': 'person',
-                'confidence': 0.91,
-                'bbox': [round(p2_x, 1), round(p2_y, 1), round(p2_x + p2_w, 1), round(p2_y + p2_h, 1)]
-            },
-            {
-                'trackId': 201,
-                'label': label1,
-                'confidence': 0.96,
-                'bbox': [round(p1_x + p1_w * 0.4, 1), round(p1_y + p1_h * 0.55, 1), round(p1_x + p1_w * 0.68, 1), round(p1_y + p1_h * 0.72, 1)]
-            },
-            {
-                'trackId': 202,
-                'label': label2,
-                'confidence': 0.92,
-                'bbox': [round(p1_x + 180 + math.sin(t * 0.25) * 20, 1), round(p1_y + 30, 1), round(p1_x + 280 + math.sin(t * 0.25) * 20, 1), round(p1_y + 110, 1)]
-            },
-            {
-                'trackId': 203,
-                'label': label3,
-                'confidence': 0.89,
-                'bbox': [round(p1_x - 160 + math.cos(t * 0.2) * 15, 1), round(p1_y + 160, 1), round(p1_x - 70 + math.cos(t * 0.2) * 15, 1), round(p1_y + 230, 1)]
-            }
-        ]
-
-        poses = [
-            {
-                'trackId': 101,
-                'keypoints': p1_kps,
-                'skeleton': SKELETON_PAIRS
-            },
-            {
-                'trackId': 102,
-                'keypoints': p2_kps,
-                'skeleton': SKELETON_PAIRS
-            }
-        ]
-
-        items = [boxes[2], boxes[3], boxes[4]]
-        sus1 = self.heuristics.evaluate_person(
-            101,
-            (p1_x, p1_y, p1_x + p1_w, p1_y + p1_h),
-            p1_kps,
-            items,
-            zones,
-            calibration
-        )
-        sus2 = self.heuristics.evaluate_person(
-            102,
-            (p2_x, p2_y, p2_x + p2_w, p2_y + p2_h),
-            p2_kps,
-            [],
-            zones,
-            calibration
-        )
-
-        suspicion = [sus1, sus2]
-        thresh = float(calibration.get('suspicionThreshold', 75))
-
-        return {
-            'frameIndex': frame_index,
-            'timestamp': int(time.time() * 1000),
-            'boxes': boxes,
-            'poses': poses,
-            'suspicion': suspicion,
-            'alertTriggered': any(s['score'] >= thresh for s in suspicion)
         }
 

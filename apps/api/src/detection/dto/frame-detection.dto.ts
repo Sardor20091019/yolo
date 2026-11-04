@@ -16,5 +16,12 @@ export class FrameDetectionDto {
   @IsString()
   @IsOptional()
   source?: 'WEBCAM' | 'IP_CAMERA';
-}
 
+  @IsOptional()
+  detectedBoxes?: Array<{
+    trackId: number;
+    label: string;
+    confidence: number;
+    bbox: [number, number, number, number];
+  }>;
+}
