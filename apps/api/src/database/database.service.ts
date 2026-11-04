@@ -58,3 +58,4 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return this.kyselyDb;
   }
 }
+

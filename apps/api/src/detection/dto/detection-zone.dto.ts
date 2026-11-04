@@ -36,3 +36,4 @@ export class UpdateDetectionZoneDto {
   @IsOptional()
   is_active?: boolean;
 }
+

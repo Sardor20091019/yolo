@@ -16,3 +16,4 @@ export interface AlertMetrics {
   confirmedCount: number;
   highRiskCount: number;
 }
+

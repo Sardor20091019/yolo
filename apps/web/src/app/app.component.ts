@@ -19,3 +19,4 @@ import { WebSocketService } from './services/websocket.service';
 export class AppComponent {
   constructor(public readonly wsService: WebSocketService) {}
 }
+

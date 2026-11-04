@@ -12,3 +12,4 @@ pip install -r apps/python-worker/requirements.txt
 npm install
 
 echo "Setup completed successfully."
+

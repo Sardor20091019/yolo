@@ -213,3 +213,4 @@ class ShopliftingHeuristicsEngine:
             'zoneName': current_zone_name,
             'triggers': triggers
         }
+

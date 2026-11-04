@@ -42,3 +42,4 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
     .execute();
 }
+

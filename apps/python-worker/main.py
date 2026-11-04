@@ -84,10 +84,10 @@ async def run_websocket_server(detector: YoloShopliftingDetector, host: str, por
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--detection-model', default=os.getenv('YOLO_DETECTION_MODEL', 'yolo26n.pt'))
-    parser.add_argument('--detection-fallback', default=os.getenv('YOLO_DETECTION_FALLBACK_MODEL', 'yolo11n.pt'))
-    parser.add_argument('--pose-model', default=os.getenv('YOLO_POSE_MODEL', 'yolo26n-pose.pt'))
-    parser.add_argument('--pose-fallback', default=os.getenv('YOLO_POSE_FALLBACK_MODEL', 'yolo11n-pose.pt'))
+    parser.add_argument('--detection-model', default=os.getenv('YOLO_DETECTION_MODEL', 'yolo26m.pt'))
+    parser.add_argument('--detection-fallback', default=os.getenv('YOLO_DETECTION_FALLBACK_MODEL', 'yolo11m.pt'))
+    parser.add_argument('--pose-model', default=os.getenv('YOLO_POSE_MODEL', 'yolo26m-pose.pt'))
+    parser.add_argument('--pose-fallback', default=os.getenv('YOLO_POSE_FALLBACK_MODEL', 'yolo11m-pose.pt'))
     parser.add_argument('--mode', default=os.getenv('PYTHON_WORKER_MODE', 'ipc'))
     parser.add_argument('--host', default=os.getenv('PYTHON_WORKER_HOST', '127.0.0.1'))
     parser.add_argument('--port', type=int, default=int(os.getenv('PYTHON_WORKER_PORT', '5001')))
@@ -108,3 +108,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+

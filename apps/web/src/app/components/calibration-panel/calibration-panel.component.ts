@@ -81,3 +81,4 @@ export class CalibrationPanelComponent implements OnInit {
     this.detectionApi.deleteZone(zone.id).subscribe();
   }
 }
+

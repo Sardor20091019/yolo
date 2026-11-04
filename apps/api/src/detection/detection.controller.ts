@@ -54,3 +54,4 @@ export class DetectionController {
     return await this.detectionService.deleteZone(id);
   }
 }
+

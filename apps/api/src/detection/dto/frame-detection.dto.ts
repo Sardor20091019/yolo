@@ -17,3 +17,4 @@ export class FrameDetectionDto {
   @IsOptional()
   source?: 'WEBCAM' | 'IP_CAMERA';
 }
+

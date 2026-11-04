@@ -9,3 +9,4 @@ import { AlertsRepository } from './alerts.repository';
   exports: [AlertsService, AlertsRepository],
 })
 export class AlertsModule {}
+

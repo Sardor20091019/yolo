@@ -76,3 +76,4 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
     return updated;
   }
 }
+

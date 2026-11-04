@@ -74,3 +74,4 @@ export class AlertsService {
     this.fetchMetrics().subscribe();
   }
 }
+

@@ -12,3 +12,4 @@ import { AlertsModule } from '../alerts/alerts.module';
   exports: [DetectionService, DetectionRepository],
 })
 export class DetectionModule {}
+

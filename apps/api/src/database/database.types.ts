@@ -50,3 +50,4 @@ export interface Database {
   detection_zones: DetectionZonesTable;
   detection_events: DetectionEventsTable;
 }
+

@@ -20,3 +20,4 @@ import { AlertsModule } from './alerts/alerts.module';
   ],
 })
 export class AppModule {}
+

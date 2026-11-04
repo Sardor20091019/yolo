@@ -6,3 +6,4 @@ export class UpdateAlertStatusDto {
   @IsIn(['NEW', 'REVIEWED', 'DISMISSED', 'CONFIRMED'])
   status!: 'NEW' | 'REVIEWED' | 'DISMISSED' | 'CONFIRMED';
 }
+

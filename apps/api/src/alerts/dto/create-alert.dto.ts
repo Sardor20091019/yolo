@@ -26,3 +26,4 @@ export class CreateAlertDto {
   @IsOptional()
   details?: string;
 }
+

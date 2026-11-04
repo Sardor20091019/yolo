@@ -74,3 +74,4 @@ export class AlertsSidebarComponent implements OnInit {
     return `http://${host}:3000${url}`;
   }
 }
+

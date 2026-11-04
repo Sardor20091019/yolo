@@ -1,6 +1,6 @@
 # Real-Time AI Shoplifting & Suspicious Behavior Detection System
 
-A high-performance full-stack computer vision security and loss prevention monorepo combining **NestJS 10+** (backend), **Angular 19+ with Signals and Tailwind CSS** (frontend), and an **Ultralytics YOLO26/YOLO11 Pose & ByteTrack Heuristics Engine** (Python worker).
+A high-performance full-stack computer vision security and loss prevention monorepo combining **NestJS 10+** (backend), **Angular 19+ with Signals and Tailwind CSS** (frontend), and an **Ultralytics YOLO26m/YOLO11m Pose & ByteTrack Heuristics Engine** (Python worker).
 
 ---
 
@@ -65,7 +65,7 @@ yolo/
 │   └── python-worker/                # Computer Vision & Heuristics Service
 │       ├── requirements.txt
 │       ├── main.py                   # IPC / WebSocket streaming bridge
-│       ├── yolo_detector.py          # YOLO26 / YOLO11 Pose & Multi-Object Tracking
+│       ├── yolo_detector.py          # YOLO26m / YOLO11m Pose & Multi-Object Tracking
 │       ├── heuristics_engine.py      # Suspicion Score Engine (Concealment, Nervous Checks, Loitering)
 │       └── tests/
 │           └── test_heuristics.py    # Unit tests for shoplifting heuristics
@@ -171,3 +171,4 @@ python3 apps/python-worker/main.py --mode websocket --port 5001
 - **Interactive Shelf ROI Tool**: Click directly on the video feed to draw polygon boundaries around high-value merchandise shelves.
 - **Real-Time Incident Log**: Instant notifications of suspicious events with captured thumbnail snapshots and audit controls (Confirm Theft, Dismiss, Review).
 - **Live Calibration Sliders**: Dynamically tune confidence, suspicion threshold, loitering limits, and sensitivity without restarting services.
+

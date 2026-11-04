@@ -87,8 +87,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   private startPythonWorker(): void {
     const pythonBin = this.configService.get<string>('python.binPath', 'python3');
     const workerScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
-    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo26n.pt');
-    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo26n-pose.pt');
+    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo26m.pt');
+    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo26m-pose.pt');
 
     try {
       this.pythonProcess = spawn(pythonBin, [
@@ -316,3 +316,4 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     return { success: true, id };
   }
 }
+

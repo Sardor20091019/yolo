@@ -44,3 +44,4 @@ export class AlertsController {
     return await this.alertsService.deleteAlert(id);
   }
 }
+

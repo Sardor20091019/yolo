@@ -23,10 +23,10 @@ SKELETON_PAIRS = [
 class YoloShopliftingDetector:
     def __init__(
         self,
-        detection_model_path: str = 'yolo26n.pt',
-        detection_fallback_path: str = 'yolo11n.pt',
-        pose_model_path: str = 'yolo26n-pose.pt',
-        pose_fallback_path: str = 'yolo11n-pose.pt'
+        detection_model_path: str = 'yolo26m.pt',
+        detection_fallback_path: str = 'yolo11m.pt',
+        pose_model_path: str = 'yolo26m-pose.pt',
+        pose_fallback_path: str = 'yolo11m-pose.pt'
     ):
         self.heuristics = ShopliftingHeuristicsEngine()
         self.detection_model = None
@@ -58,7 +58,7 @@ class YoloShopliftingDetector:
             self.cv2 = cv2
             self.np = np
 
-            det_candidates = [det_path, det_fallback, 'yolov8n.pt']
+            det_candidates = [det_path, det_fallback, 'yolo26n.pt', 'yolo11n.pt', 'yolov8m.pt', 'yolov8n.pt']
             for candidate in det_candidates:
                 try:
                     self.detection_model = YOLO(candidate)
@@ -66,7 +66,7 @@ class YoloShopliftingDetector:
                 except Exception:
                     continue
 
-            pose_candidates = [pose_path, pose_fallback, 'yolov8n-pose.pt']
+            pose_candidates = [pose_path, pose_fallback, 'yolo26n-pose.pt', 'yolo11n-pose.pt', 'yolov8m-pose.pt', 'yolov8n-pose.pt']
             for candidate in pose_candidates:
                 try:
                     self.pose_model = YOLO(candidate)
@@ -312,3 +312,4 @@ class YoloShopliftingDetector:
             'suspicion': suspicion,
             'alertTriggered': any(s['score'] >= thresh for s in suspicion)
         }
+

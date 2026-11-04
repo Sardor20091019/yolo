@@ -18,10 +18,10 @@ export default (): AppConfig => ({
     workerPort: parseInt(process.env.PYTHON_WORKER_PORT || '5001', 10),
   },
   yolo: {
-    detectionModel: process.env.YOLO_DETECTION_MODEL || 'yolo26n.pt',
-    detectionFallbackModel: process.env.YOLO_DETECTION_FALLBACK_MODEL || 'yolo11n.pt',
-    poseModel: process.env.YOLO_POSE_MODEL || 'yolo26n-pose.pt',
-    poseFallbackModel: process.env.YOLO_POSE_FALLBACK_MODEL || 'yolo11n-pose.pt',
+    detectionModel: process.env.YOLO_DETECTION_MODEL || 'yolo26m.pt',
+    detectionFallbackModel: process.env.YOLO_DETECTION_FALLBACK_MODEL || 'yolo11m.pt',
+    poseModel: process.env.YOLO_POSE_MODEL || 'yolo26m-pose.pt',
+    poseFallbackModel: process.env.YOLO_POSE_FALLBACK_MODEL || 'yolo11m-pose.pt',
   },
   thresholds: {
     defaultConfidence: parseFloat(process.env.DEFAULT_CONFIDENCE_THRESHOLD || '0.35'),
@@ -30,3 +30,4 @@ export default (): AppConfig => ({
     defaultNervousCheckLimit: parseInt(process.env.DEFAULT_NERVOUS_CHECK_LIMIT || '3', 10),
   },
 });
+

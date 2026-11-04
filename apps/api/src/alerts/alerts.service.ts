@@ -94,3 +94,4 @@ export class AlertsService {
     return await this.alertsRepository.getMetrics();
   }
 }
+

@@ -57,3 +57,4 @@ export interface StreamConfig {
   loiteringThresholdSeconds?: number;
   nervousCheckSensitivity?: number;
 }
+

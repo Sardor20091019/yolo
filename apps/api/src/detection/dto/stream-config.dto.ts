@@ -33,3 +33,4 @@ export class StreamConfigDto {
   @Max(10)
   nervousCheckSensitivity?: number;
 }
+
