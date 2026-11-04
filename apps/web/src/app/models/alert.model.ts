@@ -1,3 +1,12 @@
+export interface AlertDetails {
+  triggers: string[];
+  concealmentScore?: number;
+  nervousCount?: number;
+  loiteringSeconds?: number;
+  zoneName?: string;
+  [key: string]: any;
+}
+
 export interface AlertIncident {
   id: string;
   track_id: number;
@@ -16,4 +25,3 @@ export interface AlertMetrics {
   confirmedCount: number;
   highRiskCount: number;
 }
-

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AlertsService } from '../../services/alerts.service';
 import { WebSocketService } from '../../services/websocket.service';
-import { AlertIncident } from '../../models/alert.model';
+import { AlertIncident, AlertDetails } from '../../models/alert.model';
 
 @Component({
   selector: 'app-alerts-sidebar',
@@ -54,11 +54,20 @@ export class AlertsSidebarComponent implements OnInit {
     this.selectedModalAlert.set(null);
   }
 
-  public parseDetails(detailsStr: string): Record<string, any> {
+  public parseDetails(detailsStr: string): AlertDetails {
     try {
-      return JSON.parse(detailsStr || '{}');
+      const parsed = JSON.parse(detailsStr || '{}');
+      return {
+        triggers: Array.isArray(parsed.triggers) ? parsed.triggers : [],
+        concealmentScore: parsed.concealmentScore,
+        nervousCount: parsed.nervousCount,
+        loiteringSeconds: parsed.loiteringSeconds,
+        zoneName: parsed.zoneName,
+      };
     } catch {
-      return {};
+      return {
+        triggers: [],
+      };
     }
   }
 
@@ -74,4 +83,3 @@ export class AlertsSidebarComponent implements OnInit {
     return `http://${host}:3000${url}`;
   }
 }
-
