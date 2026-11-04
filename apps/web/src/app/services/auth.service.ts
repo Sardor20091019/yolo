@@ -166,3 +166,4 @@ export class AuthService {
     this.isAuthModalOpen.set(false);
   }
 }
+

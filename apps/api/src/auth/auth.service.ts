@@ -67,3 +67,4 @@ export class AuthService {
     throw new UnauthorizedException('Failed to authenticate Google identity');
   }
 }
+

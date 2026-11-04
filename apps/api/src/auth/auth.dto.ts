@@ -17,3 +17,4 @@ export interface AuthUserProfile {
 export interface AuthConfigResponse {
   googleClientId: string;
 }
+
