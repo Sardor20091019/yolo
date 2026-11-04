@@ -55,3 +55,4 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', os.getenv('PYTHON_WORKER_PORT', '5001')))
     server = HTTPServer(('0.0.0.0', port), handler)
     server.serve_forever()
+
