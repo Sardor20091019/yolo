@@ -42,6 +42,18 @@ export interface SuspicionBreakdown {
   triggers: string[];
 }
 
+export interface CctvStationInfo {
+  stationId: string;
+  stationName: string;
+  status: 'ONLINE' | 'STREAMING' | 'DISCONNECTED';
+  lastSeen: number;
+  fps: number;
+  totalFrames: number;
+  activeDetectionsCount: number;
+  lastDetectedObjects: string[];
+  lastFrameSnapshot?: string;
+}
+
 export interface FrameProcessingResult {
   frameIndex: number;
   timestamp: number;
@@ -67,6 +79,50 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   };
   private lastAlertTimestamps: Map<number, number> = new Map();
   private zoneDwellTrackers: Map<number, { entryTime: number; zoneName: string }> = new Map();
+  private cctvStations: Map<string, CctvStationInfo> = new Map();
+
+  public getAllCctvStations(): CctvStationInfo[] {
+    const now = Date.now();
+    const stations: CctvStationInfo[] = [];
+    this.cctvStations.forEach((station) => {
+      const isAlive = now - station.lastSeen < 20000;
+      stations.push({
+        ...station,
+        status: isAlive ? (now - station.lastSeen < 4000 ? 'STREAMING' : 'ONLINE') : 'DISCONNECTED',
+      });
+    });
+    return stations;
+  }
+
+  public registerOrUpdateStation(
+    stationId: string,
+    stationName?: string,
+    frameSnapshot?: string,
+    detectedObjects: string[] = [],
+  ): void {
+    const existing = this.cctvStations.get(stationId);
+    const now = Date.now();
+    if (existing) {
+      existing.lastSeen = now;
+      existing.totalFrames++;
+      if (stationName) existing.stationName = stationName;
+      if (frameSnapshot) existing.lastFrameSnapshot = frameSnapshot;
+      existing.activeDetectionsCount = detectedObjects.length;
+      existing.lastDetectedObjects = detectedObjects;
+    } else {
+      this.cctvStations.set(stationId, {
+        stationId,
+        stationName: stationName || `CCTV Node ${stationId}`,
+        status: 'STREAMING',
+        lastSeen: now,
+        fps: 12,
+        totalFrames: 1,
+        activeDetectionsCount: detectedObjects.length,
+        lastDetectedObjects: detectedObjects,
+        lastFrameSnapshot: frameSnapshot,
+      });
+    }
+  }
 
   constructor(
     private readonly detectionRepository: DetectionRepository,
@@ -256,6 +312,12 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
 
         if (response.ok) {
           const workerResult = (await response.json()) as FrameProcessingResult;
+          this.registerOrUpdateStation(
+            stationId || 'CCTV-MAIN',
+            stationName,
+            frameData,
+            workerResult.boxes.map((b) => b.label),
+          );
           await this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData);
           return workerResult;
         }
@@ -272,7 +334,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
             this.pendingRequests.delete(requestId);
             resolve(this.createFallbackResult(frameIndex));
           }
-        }, 2500);
+        }, 5000);
 
         this.pendingRequests.set(requestId, (res) => {
           clearTimeout(timeout);
@@ -282,11 +344,24 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         this.pythonProcess?.stdin.write(JSON.stringify(payload) + '\n');
       });
 
+      this.registerOrUpdateStation(
+        stationId || 'CCTV-MAIN',
+        stationName,
+        frameData,
+        result.boxes.map((b) => b.label),
+      );
       await this.evaluateSuspicionAndTriggerAlerts(result, frameData);
       return result;
     }
 
-    return this.createFallbackResult(frameIndex);
+    const fallback = this.createFallbackResult(frameIndex);
+    this.registerOrUpdateStation(
+      stationId || 'CCTV-MAIN',
+      stationName,
+      frameData,
+      [],
+    );
+    return fallback;
   }
 
   private pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {

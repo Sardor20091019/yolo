@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CameraStreamComponent } from './components/camera-stream/camera-stream.component';
 import { AlertsSidebarComponent } from './components/alerts-sidebar/alerts-sidebar.component';
 import { DetectionLogComponent } from './components/detection-log/detection-log.component';
+import { AdminCctvComponent } from './components/admin-cctv/admin-cctv.component';
 import { WebSocketService } from './services/websocket.service';
 import { AlertsService } from './services/alerts.service';
 import { DetectionLogService } from './services/detection-log.service';
@@ -18,15 +19,14 @@ import { AuthService } from './services/auth.service';
     CameraStreamComponent,
     AlertsSidebarComponent,
     DetectionLogComponent,
+    AdminCctvComponent,
   ],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements AfterViewInit {
   @ViewChild('googleButtonContainer') public googleBtnRef?: ElementRef<HTMLDivElement>;
 
-  public readonly activeMobileTab: WritableSignal<'feed' | 'logs' | 'alerts'> = signal<'feed' | 'logs' | 'alerts'>('feed');
-  public operatorInputName: string = '';
-  public operatorInputEmail: string = '';
+  public readonly activeTab: WritableSignal<'feed' | 'admin' | 'logs' | 'alerts'> = signal<'feed' | 'admin' | 'logs' | 'alerts'>('feed');
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -41,16 +41,11 @@ export class AppComponent implements AfterViewInit {
     }
   }
 
-  public setMobileTab(tab: 'feed' | 'logs' | 'alerts'): void {
-    this.activeMobileTab.set(tab);
+  public setActiveTab(tab: 'feed' | 'admin' | 'logs' | 'alerts'): void {
+    this.activeTab.set(tab);
   }
 
-  public submitManualOperatorLogin(): void {
-    if (!this.operatorInputName.trim() && !this.operatorInputEmail.trim()) {
-      return;
-    }
-    this.authService.loginAsOperator(this.operatorInputName, this.operatorInputEmail);
-    this.operatorInputName = '';
-    this.operatorInputEmail = '';
+  public triggerGoogleSignIn(): void {
+    this.authService.triggerGoogleOAuth();
   }
 }

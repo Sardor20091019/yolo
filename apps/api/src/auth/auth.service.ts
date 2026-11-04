@@ -29,21 +29,35 @@ export class AuthService {
 
       if (response.ok) {
         const payload = (await response.json()) as Record<string, any>;
-        if (this.googleClientId && payload.aud && !this.googleClientId.includes(payload.aud) && !payload.aud.includes(this.googleClientId)) {
-          this.logger.warn(`Google token aud mismatch: token aud is ${payload.aud}`);
-        }
-
         return {
           id: payload.sub || `google_${Date.now()}`,
-          email: payload.email || 'operator@cctv.local',
-          name: payload.name || payload.email || 'CCTV Operator',
+          email: payload.email || 'admin@cctv.local',
+          name: payload.name || payload.email || 'Admin Operator',
           picture: payload.picture || '',
-          role: 'SURVEILLANCE_OPERATOR',
+          role: 'ADMIN',
         };
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Remote Google verification network check failed: ${msg}`);
+    } catch {
+    }
+
+    try {
+      const userinfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+        headers: {
+          Authorization: `Bearer ${credential}`,
+        },
+      });
+
+      if (userinfoRes.ok) {
+        const info = (await userinfoRes.json()) as Record<string, any>;
+        return {
+          id: info.sub || `google_${Date.now()}`,
+          email: info.email || 'admin@cctv.local',
+          name: info.name || info.email || 'Admin Operator',
+          picture: info.picture || '',
+          role: 'ADMIN',
+        };
+      }
+    } catch {
     }
 
     try {
@@ -53,10 +67,10 @@ export class AuthService {
         if (decodedPayload.email || decodedPayload.sub) {
           return {
             id: decodedPayload.sub || `google_${Date.now()}`,
-            email: decodedPayload.email || 'operator@cctv.local',
-            name: decodedPayload.name || decodedPayload.email || 'CCTV Operator',
+            email: decodedPayload.email || 'admin@cctv.local',
+            name: decodedPayload.name || decodedPayload.email || 'Admin Operator',
             picture: decodedPayload.picture || '',
-            role: 'SURVEILLANCE_OPERATOR',
+            role: 'ADMIN',
           };
         }
       }
@@ -67,4 +81,3 @@ export class AuthService {
     throw new UnauthorizedException('Failed to authenticate Google identity');
   }
 }
-

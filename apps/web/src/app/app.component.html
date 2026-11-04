@@ -43,8 +43,8 @@
             <span class="text-xs font-semibold text-zinc-200 leading-none truncate max-w-[100px] sm:max-w-[130px]">
               {{ user.name }}
             </span>
-            <span class="text-[9px] font-mono text-zinc-400 leading-none mt-0.5">
-              OPERATOR
+            <span class="text-[9px] font-mono text-rose-400 font-bold leading-none mt-0.5">
+              ADMIN
             </span>
           </div>
           <button
@@ -59,34 +59,45 @@
         <button
           *ngIf="!authService.currentUser()"
           type="button"
-          (click)="authService.openAuthModal()"
-          class="flex items-center space-x-1.5 px-3 py-1 text-xs font-mono font-medium rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-zinc-200 transition-colors shadow-sm">
+          (click)="triggerGoogleSignIn()"
+          class="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-mono font-bold rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 transition-all shadow-md">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>GOOGLE AUTH</span>
+          <span>SIGN IN WITH GOOGLE</span>
         </button>
       </div>
     </div>
   </header>
 
-  <div class="lg:hidden px-3.5 pt-2 pb-1 border-b border-white/[0.06] bg-[#0c0d11]">
-    <div class="flex p-0.5 rounded-xl bg-black/40 border border-white/[0.08] font-mono text-xs">
+  <div class="px-3.5 sm:px-6 pt-3 pb-2 border-b border-white/[0.06] bg-[#0c0d11]">
+    <div class="max-w-7xl mx-auto flex p-0.5 rounded-xl bg-black/40 border border-white/[0.08] font-mono text-xs">
       <button
         type="button"
-        (click)="setMobileTab('feed')"
-        [ngClass]="activeMobileTab() === 'feed' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+        (click)="setActiveTab('feed')"
+        [ngClass]="activeTab() === 'feed' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all">
         CCTV CAMERA
       </button>
 
       <button
         type="button"
-        (click)="setMobileTab('logs')"
-        [ngClass]="activeMobileTab() === 'logs' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+        (click)="setActiveTab('admin')"
+        [ngClass]="activeTab() === 'admin' ? 'bg-rose-500/20 text-rose-200 border border-rose-500/30 font-bold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'"
+        class="flex-1 py-1.5 rounded-lg text-center transition-all flex items-center justify-center space-x-1.5">
+        <span>ADMIN CCTV MATRIX</span>
+        <span class="px-1.5 py-0.2 rounded text-[9px] bg-rose-500/30 text-rose-300 border border-rose-500/40">
+          ALL NODES
+        </span>
+      </button>
+
+      <button
+        type="button"
+        (click)="setActiveTab('logs')"
+        [ngClass]="activeTab() === 'logs' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all relative flex items-center justify-center space-x-1.5">
         <span>LOGS</span>
         <span
@@ -98,8 +109,8 @@
 
       <button
         type="button"
-        (click)="setMobileTab('alerts')"
-        [ngClass]="activeMobileTab() === 'alerts' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
+        (click)="setActiveTab('alerts')"
+        [ngClass]="activeTab() === 'alerts' ? 'bg-white/[0.1] text-white font-medium shadow-sm' : 'text-zinc-500 hover:text-zinc-300'"
         class="flex-1 py-1.5 rounded-lg text-center transition-all relative flex items-center justify-center space-x-1.5">
         <span>INCIDENTS</span>
         <span
@@ -112,34 +123,36 @@
   </div>
 
   <main class="flex-1 max-w-7xl mx-auto w-full p-3.5 sm:p-6">
-    <div class="hidden lg:grid lg:grid-cols-12 gap-6">
-      <div class="lg:col-span-8 flex flex-col space-y-6">
-        <div class="h-[520px]">
-          <app-camera-stream></app-camera-stream>
+    <div *ngIf="activeTab() === 'feed'">
+      <div class="hidden lg:grid lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-8 flex flex-col space-y-6">
+          <div class="h-[520px]">
+            <app-camera-stream></app-camera-stream>
+          </div>
+          <div>
+            <app-detection-log></app-detection-log>
+          </div>
         </div>
-
-        <div>
-          <app-detection-log></app-detection-log>
+        <div class="lg:col-span-4 h-full min-h-[600px]">
+          <app-alerts-sidebar></app-alerts-sidebar>
         </div>
       </div>
 
-      <div class="lg:col-span-4 h-full min-h-[600px]">
-        <app-alerts-sidebar></app-alerts-sidebar>
+      <div class="lg:hidden h-[460px] xs:h-[500px] sm:h-[540px]">
+        <app-camera-stream></app-camera-stream>
       </div>
     </div>
 
-    <div class="lg:hidden">
-      <div *ngIf="activeMobileTab() === 'feed'" class="h-[440px] xs:h-[480px] sm:h-[520px]">
-        <app-camera-stream></app-camera-stream>
-      </div>
+    <div *ngIf="activeTab() === 'admin'" class="min-h-[550px]">
+      <app-admin-cctv></app-admin-cctv>
+    </div>
 
-      <div *ngIf="activeMobileTab() === 'logs'">
-        <app-detection-log></app-detection-log>
-      </div>
+    <div *ngIf="activeTab() === 'logs'">
+      <app-detection-log></app-detection-log>
+    </div>
 
-      <div *ngIf="activeMobileTab() === 'alerts'" class="min-h-[500px]">
-        <app-alerts-sidebar></app-alerts-sidebar>
-      </div>
+    <div *ngIf="activeTab() === 'alerts'" class="min-h-[500px]">
+      <app-alerts-sidebar></app-alerts-sidebar>
     </div>
   </main>
 
@@ -158,10 +171,10 @@
           </div>
           <div>
             <h3 class="text-sm font-bold text-zinc-100 uppercase tracking-wide">
-              SURVEILLANCE OPERATOR AUTH
+              ADMIN GOOGLE AUTHENTICATION
             </h3>
             <p class="text-[11px] font-mono text-zinc-400">
-              Sign in to manage and review CCTV telemetry
+              Authorized access to all CCTV stations
             </p>
           </div>
         </div>
@@ -173,35 +186,34 @@
         </button>
       </div>
 
-      <div class="p-4 rounded-xl bg-black/40 border border-white/[0.06] flex flex-col items-center justify-center space-y-3">
-        <span class="text-xs font-mono text-zinc-400 text-center">
-          Official Google OAuth Authentication
-        </span>
-        <div #googleButtonContainer class="flex justify-center min-h-[40px]"></div>
+      <div *ngIf="authService.authErrorMessage()" class="px-3 py-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono">
+        {{ authService.authErrorMessage() }}
       </div>
 
-      <div class="flex items-center space-x-2 text-[11px] font-mono text-zinc-500">
-        <div class="flex-1 border-t border-white/[0.08]"></div>
-        <span>OR QUICK OPERATOR LOGIN</span>
-        <div class="flex-1 border-t border-white/[0.08]"></div>
-      </div>
+      <div class="p-6 rounded-xl bg-black/50 border border-white/[0.08] flex flex-col items-center justify-center space-y-4 text-center">
+        <div class="w-12 h-12 rounded-full bg-white/[0.04] border border-white/[0.1] flex items-center justify-center">
+          <svg class="w-6 h-6" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+        </div>
 
-      <div class="space-y-2">
-        <input
-          type="text"
-          [(ngModel)]="operatorInputName"
-          placeholder="Operator Name (e.g. Sgt. Vance)"
-          class="w-full bg-black/50 border border-white/[0.1] rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30" />
-        <input
-          type="email"
-          [(ngModel)]="operatorInputEmail"
-          placeholder="Operator Email (e.g. vance@security.corp)"
-          class="w-full bg-black/50 border border-white/[0.1] rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30" />
+        <div>
+          <h4 class="text-xs font-mono font-bold text-zinc-200 uppercase">
+            Sign in with Authorized Google Account
+          </h4>
+          <p class="text-[11px] font-mono text-zinc-500 mt-1 max-w-xs">
+            Admin privileges grant live access to all connected CCTV cameras across the facility.
+          </p>
+        </div>
+
         <button
           type="button"
-          (click)="submitManualOperatorLogin()"
-          class="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-mono font-bold text-xs rounded-lg transition-colors">
-          AUTHENTICATE AS OPERATOR
+          (click)="triggerGoogleSignIn()"
+          class="w-full py-2.5 px-4 bg-white hover:bg-zinc-200 text-zinc-950 font-mono font-bold text-xs rounded-xl transition-all shadow-lg flex items-center justify-center space-x-2">
+          <span>AUTHENTICATE WITH GOOGLE</span>
         </button>
       </div>
     </div>

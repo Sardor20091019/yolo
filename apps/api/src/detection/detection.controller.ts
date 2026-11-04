@@ -33,6 +33,11 @@ export class DetectionController {
     );
   }
 
+  @Get('cctv-stations')
+  public getCctvStations(): import('./detection.service').CctvStationInfo[] {
+    return this.detectionService.getAllCctvStations();
+  }
+
   @Get('zones')
   public async getZones(): Promise<DetectionZoneRecord[]> {
     return await this.detectionService.getAllZones();

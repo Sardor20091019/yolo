@@ -100,7 +100,28 @@ class YoloShopliftingDetector:
             self.cv2 = cv2
             self.np = np
 
-            det_candidates = [det_path, det_fallback, 'yolo26n.pt', 'yolo11n.pt', 'yolov8m.pt', 'yolov8n.pt']
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            repo_dir = os.path.dirname(os.path.dirname(base_dir))
+
+            def resolve_model_file(name: str) -> str:
+                paths_to_check = [
+                    name,
+                    os.path.join(base_dir, name),
+                    os.path.join(repo_dir, name),
+                    os.path.join(os.getcwd(), name),
+                ]
+                for p in paths_to_check:
+                    if os.path.isfile(p):
+                        return p
+                return name
+
+            det_candidates = [
+                resolve_model_file(det_path),
+                resolve_model_file(det_fallback),
+                resolve_model_file('yolo11n.pt'),
+                resolve_model_file('yolov8n.pt'),
+                'yolo11n.pt',
+            ]
             for candidate in det_candidates:
                 try:
                     self.detection_model = YOLO(candidate)
@@ -108,7 +129,13 @@ class YoloShopliftingDetector:
                 except Exception:
                     continue
 
-            pose_candidates = [pose_path, pose_fallback, 'yolo26n-pose.pt', 'yolo11n-pose.pt', 'yolov8m-pose.pt', 'yolov8n-pose.pt']
+            pose_candidates = [
+                resolve_model_file(pose_path),
+                resolve_model_file(pose_fallback),
+                resolve_model_file('yolo11n-pose.pt'),
+                resolve_model_file('yolov8n-pose.pt'),
+                'yolo11n-pose.pt',
+            ]
             for candidate in pose_candidates:
                 try:
                     self.pose_model = YOLO(candidate)
