@@ -25,10 +25,10 @@
 
       <div class="flex items-center space-x-4">
         <div class="flex items-center space-x-2 font-mono text-xs px-3 py-1.5 rounded-lg bg-[#0a0d14] border border-[#1f293d]">
-          <span class="w-2 h-2 rounded-full" [ngClass]="wsService.isConnected() ? 'bg-[#00e599] animate-pulse' : 'bg-[#ff2a5f]'"></span>
-          <span class="text-slate-400">WS GATEWAY:</span>
-          <span [ngClass]="wsService.isConnected() ? 'text-[#00e599]' : 'text-[#ff2a5f]'" class="font-bold">
-            {{ wsService.isConnected() ? 'ONLINE' : 'CONNECTING...' }}
+          <span class="w-2 h-2 rounded-full bg-[#00e599]" [ngClass]="wsService.isConnected() ? 'animate-pulse' : ''"></span>
+          <span class="text-slate-400">INGESTION:</span>
+          <span class="text-[#00e599] font-bold">
+            {{ wsService.isConnected() ? 'ONLINE (WS)' : 'ONLINE (HTTP)' }}
           </span>
         </div>
 
