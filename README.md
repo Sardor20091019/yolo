@@ -159,6 +159,25 @@ python3 apps/python-worker/main.py --mode websocket --port 5001
 
 ---
 
+## Single-Project Vercel Deployment
+
+The monorepo is configured for instant, single-project deployment on **Vercel** with zero external platform dependencies:
+
+1. Connect your repository to Vercel or run:
+   ```bash
+   vercel
+   ```
+2. Configure your Environment Variables in the Vercel dashboard:
+   - `DATABASE_URL`: Your PostgreSQL (Neon) connection string
+   - `NODE_ENV`: `production`
+3. Vercel automatically:
+   - Builds the Angular 19 frontend into static edge assets (`apps/web/dist/web/browser`)
+   - Deploys the NestJS backend as a serverless API handler (`api/index.ts`)
+   - Executes the native AI heuristics engine for continuous risk scoring without needing background daemon workers
+   - Streams camera frames seamlessly over HTTP (`/api/detection/process-frame`) with real-time HUD rendering
+
+---
+
 ## Key Features
 
 - **Mode A (Webcam)**: Direct browser camera streaming via HTML5 Canvas WebSocket to the NestJS gateway.
