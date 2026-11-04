@@ -1,165 +1,137 @@
-<div class="min-h-screen bg-[#030407] flex flex-col text-[#f4f4f6] font-sans selection:bg-rose-500/20 selection:text-rose-200 tactical-grid">
-  <div class="bg-gradient-to-r from-rose-950/60 via-black to-zinc-950/60 border-b border-rose-500/20 px-4 py-1.5 text-center text-[10px] sm:text-[11px] font-mono text-rose-300 flex items-center justify-center space-x-3 backdrop-blur-xl">
-    <div class="flex items-center space-x-1.5">
-      <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping"></span>
-      <span class="font-bold text-rose-400 tracking-wider">CCTV SECURITY PROTOCOL ACTIVE</span>
+<div class="min-h-screen bg-obs-bg flex flex-col font-sans" style="color:#d0cdc4">
+
+  <div class="border-b hairline px-6 py-2 flex items-center justify-between" style="background:#111110">
+    <div class="flex items-center space-x-3">
+      <span class="status-dot animate-live" style="background:#3d6b54"></span>
+      <span class="label" style="color:#3d6b54">SURVEILLANCE SYSTEM ACTIVE</span>
     </div>
-    <span class="text-white/20">&bull;</span>
-    <span class="tracking-widest hidden sm:inline text-zinc-400">
-      CENTRAL PYTHON YOLOv11 ENGINE &bull; ALL CONNECTED CAMERAS TRANSMIT TO SURVEILLANCE MATRIX
-    </span>
-    <span class="tracking-widest sm:hidden text-zinc-400">
-      YOLOv11 OPTICAL STREAM
-    </span>
+    <span class="label hidden sm:block">CENTRAL YOLO INFERENCE ENGINE &bull; ALL CAMERAS TRANSMIT TO COMMAND NODE</span>
+    <div class="flex items-center space-x-2">
+      <span class="status-dot" [style.background]="wsService.isConnected() ? '#3d6b54' : '#7a4242'"></span>
+      <span class="label" [style.color]="wsService.isConnected() ? '#3d6b54' : '#7a4242'">
+        {{ wsService.isConnected() ? 'YOLO ONLINE' : 'OFFLINE' }}
+      </span>
+    </div>
   </div>
 
-  <header class="bg-[#06080e]/95 border-b border-white/[0.08] px-4 sm:px-6 py-3.5 backdrop-blur-2xl sticky top-0 z-40 shadow-[0_10px_35px_rgba(0,0,0,0.8)]">
-    <div class="flex items-center justify-between max-w-7xl mx-auto w-full gap-3">
-      <div class="flex items-center space-x-3.5">
-        <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500/20 via-black to-rose-950/40 border border-rose-500/30 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.25)]">
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+  <header class="border-b hairline sticky top-0 z-40" style="background:#0b0b09">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2.5">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#a88840" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
           </svg>
-          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <span class="text-base font-extrabold tracking-wider text-white">ASTRO<span class="text-rose-500 font-black">VISION</span></span>
-            <span class="text-[9px] font-mono text-rose-400 font-bold px-1.5 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/30 uppercase tracking-widest">
-              v4.2 CCTV
-            </span>
+          <div>
+            <div class="font-sans font-semibold text-sm tracking-tight" style="color:#d0cdc4">ASTROVISION</div>
+            <div class="label" style="letter-spacing:0.14em">SURVEILLANCE COMMAND</div>
           </div>
-          <span class="text-[9px] font-mono text-zinc-500 block leading-none mt-0.5 tracking-widest uppercase">
-            AUTONOMOUS OPTICAL NEURAL MATRIX
-          </span>
-        </div>
-      </div>
-
-      <div class="flex items-center space-x-2.5 sm:space-x-3">
-        <div class="hidden md:flex items-center space-x-2 text-[11px] font-mono px-3.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-zinc-300">
-          <span class="w-2 h-2 rounded-full" [ngClass]="wsService.isConnected() ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
-          <span class="text-zinc-300 font-semibold tracking-wider">
-            {{ wsService.isConnected() ? 'PYTHON YOLO ONLINE' : 'STANDALONE SENSOR' }}
-          </span>
         </div>
 
-        <div *ngIf="authService.currentUser() as user" class="flex items-center space-x-2.5 bg-black/80 border border-white/[0.14] px-3.5 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl">
-          <img
-            *ngIf="user.picture"
-            [src]="user.picture"
-            alt="Avatar"
-            class="w-6 h-6 rounded-full object-cover border border-white/40" />
-          <div
-            *ngIf="!user.picture"
-            class="w-6 h-6 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-[10px] font-bold text-rose-300">
-            {{ user.name.slice(0, 1).toUpperCase() }}
-          </div>
-          <div class="flex flex-col text-left">
-            <span class="text-xs font-bold text-white leading-tight truncate max-w-[110px] sm:max-w-[160px]">
-              {{ user.name }}
-            </span>
-            <span class="text-[9px] font-mono text-rose-400 font-bold leading-none mt-0.5 tracking-widest">
-              ADMIN CLEARANCE
-            </span>
-          </div>
+        <div class="hidden sm:block w-px h-6 hairline" style="border-left:1px solid rgba(210,205,195,0.1)"></div>
+
+        <nav class="hidden sm:flex items-center space-x-1">
           <button
             type="button"
-            (click)="authService.signOut()"
-            class="text-[11px] font-mono text-zinc-400 hover:text-rose-300 px-2 py-0.5 rounded-lg transition-colors ml-1"
-            title="Sign out of surveillance matrix">
-            &times;
+            (click)="setActiveTab('feed')"
+            [style.color]="activeTab() === 'feed' ? '#d0cdc4' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'feed' ? '1px solid #a88840' : '1px solid transparent'"
+            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
+            SENSOR FEED
           </button>
+          <button
+            type="button"
+            (click)="setActiveTab('admin')"
+            [style.color]="activeTab() === 'admin' ? '#d0cdc4' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'admin' ? '1px solid #a88840' : '1px solid transparent'"
+            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
+            ADMIN MATRIX
+          </button>
+          <button
+            type="button"
+            (click)="setActiveTab('logs')"
+            [style.color]="activeTab() === 'logs' ? '#d0cdc4' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'logs' ? '1px solid #a88840' : '1px solid transparent'"
+            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
+            ACTIVITY LOG
+            <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag">{{ logService.logs().length }}</span>
+          </button>
+          <button
+            type="button"
+            (click)="setActiveTab('alerts')"
+            [style.color]="activeTab() === 'alerts' ? '#d0cdc4' : '#524f4b'"
+            [style.border-bottom]="activeTab() === 'alerts' ? '1px solid #a88840' : '1px solid transparent'"
+            class="px-3 py-1.5 text-xs font-mono tracking-label uppercase transition-colors"
+            style="letter-spacing:0.1em; background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; padding-bottom:calc(0.375rem + 1px)">
+            INCIDENTS
+            <span *ngIf="alertsService.metrics().highRiskCount > 0" class="ml-1.5 tag tag-red">{{ alertsService.metrics().highRiskCount }}</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <div *ngIf="authService.currentUser() as user" class="flex items-center space-x-2.5 panel px-3 py-1.5" style="border-radius:2px">
+          <img *ngIf="user.picture" [src]="user.picture" alt="Operator" class="w-5 h-5 rounded-full object-cover"/>
+          <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono" style="background:#1e1e1c; color:#8c8880">
+            {{ user.name.slice(0,1).toUpperCase() }}
+          </div>
+          <div class="hidden sm:flex flex-col">
+            <span class="text-xs font-sans font-medium truncate max-w-[120px]" style="color:#d0cdc4">{{ user.name }}</span>
+            <span class="label" style="color:#3d6b54">OPERATOR CLEARED</span>
+          </div>
+          <button type="button" (click)="authService.signOut()" class="btn-ghost" style="padding:0.15rem 0.5rem; font-size:0.65rem">&times;</button>
         </div>
 
         <button
           *ngIf="!authService.currentUser()"
           type="button"
           (click)="openLoginModal()"
-          class="flex items-center space-x-2 px-4 py-2 text-xs font-mono font-bold rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 transition-all shadow-[0_0_25px_rgba(255,255,255,0.25)] hover:shadow-[0_0_35px_rgba(255,255,255,0.4)] tracking-wider">
+          class="btn-ghost flex items-center space-x-2"
+          style="border-radius:2px">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>ADMIN ACCESS</span>
+          <span>AUTHENTICATE</span>
         </button>
+
+        <div #headerGoogleBtn></div>
       </div>
+    </div>
+
+    <div class="sm:hidden border-t hairline px-4 py-2 flex" style="background:#0b0b09">
+      <button type="button" (click)="setActiveTab('feed')" [style.color]="activeTab() === 'feed' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">FEED</button>
+      <button type="button" (click)="setActiveTab('admin')" [style.color]="activeTab() === 'admin' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">ADMIN</button>
+      <button type="button" (click)="setActiveTab('logs')" [style.color]="activeTab() === 'logs' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">LOGS</button>
+      <button type="button" (click)="setActiveTab('alerts')" [style.color]="activeTab() === 'alerts' ? '#a88840' : '#524f4b'" class="flex-1 text-center py-1.5 text-xs font-mono uppercase tracking-wider transition-colors" style="background:transparent; border:none; cursor:pointer">INCIDENTS</button>
     </div>
   </header>
 
-  <div class="px-3.5 sm:px-6 pt-3 pb-2 border-b border-white/[0.06] bg-[#05070c]/90 backdrop-blur-xl">
-    <div class="max-w-7xl mx-auto flex p-1 rounded-2xl bg-black/70 border border-white/[0.08] font-mono text-xs backdrop-blur-2xl">
-      <button
-        type="button"
-        (click)="setActiveTab('feed')"
-        [ngClass]="activeTab() === 'feed' ? 'bg-white text-zinc-950 font-bold shadow-[0_0_20px_rgba(255,255,255,0.25)]' : 'text-zinc-400 hover:text-white'"
-        class="flex-1 py-2.5 rounded-xl text-center transition-all tracking-wider flex items-center justify-center space-x-1.5">
-        <span class="w-2 h-2 rounded-full" [ngClass]="activeTab() === 'feed' ? 'bg-rose-500' : 'bg-zinc-600'"></span>
-        <span>CCTV SENSOR</span>
-      </button>
+  <main class="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-6">
 
-      <button
-        type="button"
-        (click)="setActiveTab('admin')"
-        [ngClass]="activeTab() === 'admin' ? 'bg-rose-600 text-white font-bold shadow-[0_0_25px_rgba(244,63,94,0.45)]' : 'text-zinc-400 hover:text-white'"
-        class="flex-1 py-2.5 rounded-xl text-center transition-all flex items-center justify-center space-x-2 tracking-wider">
-        <span>ADMIN MATRIX</span>
-        <span class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[9px] bg-white/20 text-white font-bold">
-          ALL CAMERAS
-        </span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setActiveTab('logs')"
-        [ngClass]="activeTab() === 'logs' ? 'bg-white text-zinc-950 font-bold shadow-[0_0_20px_rgba(255,255,255,0.25)]' : 'text-zinc-400 hover:text-white'"
-        class="flex-1 py-2.5 rounded-xl text-center transition-all relative flex items-center justify-center space-x-1.5 tracking-wider">
-        <span>LOGS</span>
-        <span
-          *ngIf="logService.logs().length > 0"
-          class="px-1.5 py-0.5 rounded-md text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-          {{ logService.logs().length }}
-        </span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setActiveTab('alerts')"
-        [ngClass]="activeTab() === 'alerts' ? 'bg-white text-zinc-950 font-bold shadow-[0_0_20px_rgba(255,255,255,0.25)]' : 'text-zinc-400 hover:text-white'"
-        class="flex-1 py-2.5 rounded-xl text-center transition-all relative flex items-center justify-center space-x-1.5 tracking-wider">
-        <span>INCIDENTS</span>
-        <span
-          *ngIf="alertsService.metrics().highRiskCount > 0"
-          class="px-1.5 py-0.5 rounded-md text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/40">
-          {{ alertsService.metrics().highRiskCount }}
-        </span>
-      </button>
-    </div>
-  </div>
-
-  <main class="flex-1 max-w-7xl mx-auto w-full p-3.5 sm:p-6">
     <div *ngIf="activeTab() === 'feed'">
-      <div class="hidden lg:grid lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-8 flex flex-col space-y-6">
-          <div class="h-[520px]">
+      <div class="hidden lg:grid lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-8 flex flex-col space-y-5">
+          <div style="height:520px">
             <app-camera-stream></app-camera-stream>
           </div>
-          <div>
-            <app-detection-log></app-detection-log>
-          </div>
+          <app-detection-log></app-detection-log>
         </div>
-        <div class="lg:col-span-4 h-full min-h-[600px]">
+        <div class="lg:col-span-4">
           <app-alerts-sidebar></app-alerts-sidebar>
         </div>
       </div>
 
-      <div class="lg:hidden h-[460px] xs:h-[500px] sm:h-[540px]">
+      <div class="lg:hidden" style="height:460px">
         <app-camera-stream></app-camera-stream>
       </div>
     </div>
 
-    <div *ngIf="activeTab() === 'admin'" class="min-h-[550px]">
+    <div *ngIf="activeTab() === 'admin'" class="min-h-96">
       <app-admin-cctv></app-admin-cctv>
     </div>
 
@@ -167,101 +139,72 @@
       <app-detection-log></app-detection-log>
     </div>
 
-    <div *ngIf="activeTab() === 'alerts'" class="min-h-[500px]">
+    <div *ngIf="activeTab() === 'alerts'" class="min-h-96">
       <app-alerts-sidebar></app-alerts-sidebar>
     </div>
+
   </main>
 
-  <footer class="border-t border-white/[0.06] bg-[#04060a] px-4 sm:px-6 py-4 text-center text-xs text-zinc-500 font-mono tracking-wider">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <div class="flex items-center space-x-2 text-zinc-400">
-        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-        <span>ASTROVision Autonomous Optical Surveillance Matrix</span>
-      </div>
-      <div class="text-[11px] text-zinc-600">
-        Engine: Ultralytics YOLOv11 &bull; Kysely PostgreSQL &bull; Monorepo Architecture
-      </div>
+  <footer class="border-t hairline px-6 py-3" style="background:#0b0b09">
+    <div class="max-w-screen-xl mx-auto flex items-center justify-between">
+      <span class="label">ASTROVISION &bull; ULTRALYTICS YOLO11 &bull; KYSELY POSTGRESQL</span>
+      <span class="label">SYSTEM OPERATIONAL</span>
     </div>
   </footer>
 
-  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
-    <div class="bg-[#090c13] border border-white/[0.14] rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-[0_30px_90px_rgba(0,0,0,0.95)] flex flex-col space-y-6 relative overflow-hidden">
-      <div class="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(11,11,9,0.95)">
+    <div class="panel max-w-sm w-full flex flex-col" style="border-radius:2px; overflow:hidden">
 
-      <div class="flex items-center justify-between relative z-10">
-        <div class="flex items-center space-x-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-white uppercase tracking-wider">
-              SURVEILLANCE CLEARANCE
-            </h3>
-            <p class="text-[11px] font-mono text-zinc-400 mt-0.5">
-              Admin access to central CCTV multiplex
-            </p>
-          </div>
+      <div class="flex items-center justify-between px-5 py-4 border-b hairline" style="background:#111110">
+        <div>
+          <div class="text-xs font-mono font-semibold uppercase tracking-wider" style="color:#d0cdc4; letter-spacing:0.14em">OPERATOR AUTHENTICATION</div>
+          <div class="label mt-0.5">SURVEILLANCE COMMAND CLEARANCE REQUIRED</div>
         </div>
-        <button
-          type="button"
-          (click)="authService.closeAuthModal()"
-          class="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.15] text-zinc-400 hover:text-white flex items-center justify-center font-mono text-base transition-colors">
-          &times;
-        </button>
+        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost" style="padding:0.2rem 0.5rem">&times;</button>
       </div>
 
-      <div *ngIf="authService.authErrorMessage()" class="px-4 py-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono leading-relaxed">
-        {{ authService.authErrorMessage() }}
+      <div *ngIf="authService.authErrorMessage()" class="px-5 py-3 border-b hairline" style="background:rgba(122,66,66,0.08); color:#7a4242">
+        <span class="text-xs font-mono">{{ authService.authErrorMessage() }}</span>
       </div>
 
-      <div class="p-6 rounded-2xl bg-black/60 border border-white/[0.08] flex flex-col items-center justify-center space-y-5 text-center relative z-10">
-        <div class="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.1] flex items-center justify-center shadow-inner">
+      <div class="p-5 flex flex-col space-y-4">
+        <div class="flex flex-col items-center space-y-3 py-4 border hairline" style="border-radius:2px">
           <svg class="w-8 h-8" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
+          <div class="label text-center">AUTHENTICATE WITH GOOGLE IDENTITY</div>
+          <div #modalGoogleBtn class="w-full flex justify-center min-h-10"></div>
+          <button
+            type="button"
+            (click)="triggerGoogleSignIn()"
+            [disabled]="authService.isAuthenticating()"
+            class="btn-primary w-full text-center"
+            style="border-radius:2px">
+            {{ authService.isAuthenticating() ? 'AUTHENTICATING...' : 'SIGN IN WITH GOOGLE' }}
+          </button>
+          <button
+            type="button"
+            (click)="triggerDirectGoogleRedirect()"
+            class="btn-ghost w-full text-center"
+            style="border-radius:2px">
+            GOOGLE REDIRECT (NO POPUP)
+          </button>
         </div>
 
-        <div>
-          <h4 class="text-xs font-mono font-bold text-white uppercase tracking-wider">
-            Authenticate with Google Identity
-          </h4>
-          <p class="text-[11px] font-mono text-zinc-400 mt-1 max-w-xs leading-relaxed">
-            Verifies operator clearance for all connected CCTV optical feeds and detection logs.
-          </p>
-        </div>
-
-        <div #modalGoogleBtn class="w-full flex justify-center min-h-[44px]"></div>
-
-        <button
-          type="button"
-          (click)="triggerGoogleSignIn()"
-          [disabled]="authService.isAuthenticating()"
-          class="w-full py-3 px-5 bg-white hover:bg-zinc-200 text-zinc-950 font-mono font-bold text-xs rounded-xl transition-all shadow-xl flex items-center justify-center space-x-2 tracking-wider">
-          <span *ngIf="!authService.isAuthenticating()">SIGN IN WITH GOOGLE (POPUP)</span>
-          <span *ngIf="authService.isAuthenticating()" class="animate-pulse">AUTHENTICATING IDENTITY...</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="triggerDirectGoogleRedirect()"
-          class="w-full py-2.5 px-4 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 font-mono text-xs rounded-xl border border-white/[0.1] transition-all tracking-wider">
-          DIRECT GOOGLE REDIRECT (NO POPUP)
-        </button>
-
-        <div class="w-full pt-3 border-t border-white/[0.08] flex flex-col items-center">
+        <div class="pt-2 border-t hairline flex justify-center">
           <button
             type="button"
             (click)="triggerOperatorQuickAccess()"
-            class="text-[11px] font-mono text-zinc-400 hover:text-rose-400 underline decoration-dotted transition-colors">
-            Operator Passkey (Quick Admin Access)
+            class="label hover:underline transition-colors"
+            style="background:transparent; border:none; cursor:pointer; color:#524f4b">
+            OPERATOR PASSKEY ACCESS
           </button>
         </div>
       </div>
     </div>
   </div>
+
 </div>

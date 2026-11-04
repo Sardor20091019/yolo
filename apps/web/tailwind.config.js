@@ -1,35 +1,42 @@
 module.exports = {
-  content: [
-    "./src/**/*.{html,ts}",
-  ],
+  content: ['./src/**/*.{html,ts}'],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        dark: {
-          bg: '#08090b',
-          card: '#0f1115',
-          elevated: '#16181f',
-          border: 'rgba(255, 255, 255, 0.07)',
-          borderHover: 'rgba(255, 255, 255, 0.14)',
+        obs: {
+          bg: '#0b0b09',
+          1: '#111110',
+          2: '#171715',
+          3: '#1e1e1c',
+          4: '#252523',
         },
-        studio: {
-          bone: '#f4f4f6',
-          muted: '#8e95a5',
-          dim: '#525866',
-          safe: '#10b981',
-          warning: '#f59e0b',
-          danger: '#f43f5e',
-        }
+        'tx-1': '#d0cdc4',
+        'tx-2': '#8c8880',
+        'tx-3': '#524f4b',
+        amber: {
+          ops: '#a88840',
+          'ops-dim': '#6b5828',
+        },
+        green: {
+          ops: '#3d6b54',
+        },
+        red: {
+          ops: '#7a4242',
+        },
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'Menlo', 'monospace'],
+        sans: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
       },
       letterSpacing: {
-        tightest: '-0.035em',
-        widest: '0.2em',
-      }
+        label: '0.1em',
+        wide2: '0.18em',
+        spread: '0.25em',
+      },
+      borderColor: {
+        DEFAULT: 'rgba(210,205,195,0.08)',
+      },
     },
   },
   plugins: [],
