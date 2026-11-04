@@ -8,7 +8,7 @@ import { DetectionRepository } from './detection.repository';
 import { AlertsService } from '../alerts/alerts.service';
 import { CreateDetectionZoneDto, UpdateDetectionZoneDto } from './dto/detection-zone.dto';
 import { StreamConfigDto } from './dto/stream-config.dto';
-import { DetectionZoneRecord, NewDetectionZoneRecord, DetectionZoneUpdateRecord } from '../database/database.types';
+import { DetectionZoneRecord, NewDetectionZoneRecord, DetectionZoneUpdateRecord, DetectionLogRecord, NewDetectionLogRecord } from '../database/database.types';
 
 export interface BoundingBox {
   trackId: number;
@@ -319,6 +319,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
             workerResult.boxes.map((b) => b.label),
           );
           await this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData);
+          await this.persistAnalyzedDetections(workerResult, stationId, stationName);
           return workerResult;
         }
       } catch (err: unknown) {
@@ -351,6 +352,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         result.boxes.map((b) => b.label),
       );
       await this.evaluateSuspicionAndTriggerAlerts(result, frameData);
+      await this.persistAnalyzedDetections(result, stationId, stationName);
       return result;
     }
 
@@ -549,6 +551,48 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException(`Detection zone with ID ${id} not found`);
     }
     return { success: true, id };
+  }
+
+  private async persistAnalyzedDetections(
+    result: FrameProcessingResult,
+    stationId?: string,
+    stationName?: string,
+  ): Promise<void> {
+    if (!result.boxes || result.boxes.length === 0) {
+      return;
+    }
+    const suspicionMap = new Map<number, SuspicionBreakdown>();
+    if (result.suspicion) {
+      result.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+    }
+    const records: NewDetectionLogRecord[] = result.boxes.map((box) => {
+      const sus = suspicionMap.get(box.trackId);
+      return {
+        station_id: stationId || 'CCTV-MAIN',
+        station_name: stationName || 'CCTV Optical Sensor',
+        frame_index: result.frameIndex,
+        track_id: box.trackId,
+        label: box.label,
+        confidence: box.confidence,
+        bbox: JSON.stringify(box.bbox),
+        suspicion_score: sus ? sus.score : 0,
+        triggers: JSON.stringify(sus ? sus.triggers : []),
+      };
+    });
+    try {
+      await this.detectionRepository.createDetectionLogsBatch(records);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to persist detection logs: ${msg}`);
+    }
+  }
+
+  public async getDetectionLogs(limit: number = 100): Promise<DetectionLogRecord[]> {
+    return await this.detectionRepository.getRecentDetectionLogs(limit);
+  }
+
+  public async saveDetectionLogsBatch(logs: NewDetectionLogRecord[]): Promise<DetectionLogRecord[]> {
+    return await this.detectionRepository.createDetectionLogsBatch(logs);
   }
 }
 

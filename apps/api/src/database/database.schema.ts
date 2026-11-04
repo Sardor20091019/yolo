@@ -41,5 +41,20 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .addColumn('zone_id', 'uuid')
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
     .execute();
-}
 
+  await db.schema
+    .createTable('detection_logs')
+    .ifNotExists()
+    .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+    .addColumn('station_id', 'varchar(64)', (col) => col.notNull().defaultTo('CCTV-NODE-01'))
+    .addColumn('station_name', 'varchar(128)', (col) => col.notNull().defaultTo('Optical Sensor Alpha'))
+    .addColumn('frame_index', 'integer', (col) => col.notNull().defaultTo(0))
+    .addColumn('track_id', 'integer', (col) => col.notNull().defaultTo(0))
+    .addColumn('label', 'varchar(64)', (col) => col.notNull())
+    .addColumn('confidence', 'real', (col) => col.notNull().defaultTo(0))
+    .addColumn('bbox', 'text', (col) => col.notNull().defaultTo('[]'))
+    .addColumn('suspicion_score', 'real', (col) => col.notNull().defaultTo(0))
+    .addColumn('triggers', 'text', (col) => col.notNull().defaultTo('[]'))
+    .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
+    .execute();
+}

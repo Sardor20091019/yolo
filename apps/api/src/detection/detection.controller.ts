@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { DetectionService, FrameProcessingResult } from './detection.service';
 import { CreateDetectionZoneDto, UpdateDetectionZoneDto } from './dto/detection-zone.dto';
 import { StreamConfigDto } from './dto/stream-config.dto';
 import { FrameDetectionDto } from './dto/frame-detection.dto';
-import { DetectionZoneRecord } from '../database/database.types';
+import { DetectionZoneRecord, DetectionLogRecord, NewDetectionLogRecord } from '../database/database.types';
 
 @Controller('detection')
 export class DetectionController {
@@ -36,6 +36,18 @@ export class DetectionController {
   @Get('cctv-stations')
   public getCctvStations(): import('./detection.service').CctvStationInfo[] {
     return this.detectionService.getAllCctvStations();
+  }
+
+  @Get('logs')
+  public async getDetectionLogs(@Query('limit') limit?: string): Promise<DetectionLogRecord[]> {
+    const num = limit ? parseInt(limit, 10) : 100;
+    return await this.detectionService.getDetectionLogs(num);
+  }
+
+  @Post('logs')
+  @HttpCode(HttpStatus.CREATED)
+  public async createDetectionLogs(@Body() logs: NewDetectionLogRecord[]): Promise<DetectionLogRecord[]> {
+    return await this.detectionService.saveDetectionLogsBatch(logs);
   }
 
   @Get('zones')

@@ -1,4 +1,4 @@
-import { Component, signal, WritableSignal, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CameraStreamComponent } from './components/camera-stream/camera-stream.component';
@@ -23,11 +23,9 @@ import { AuthService } from './services/auth.service';
   ],
   templateUrl: './app.component.html',
 })
-export class AppComponent implements AfterViewInit {
-  @ViewChild('headerGoogleBtn') public headerGoogleBtnRef?: ElementRef<HTMLDivElement>;
-  @ViewChild('modalGoogleBtn') public modalGoogleBtnRef?: ElementRef<HTMLDivElement>;
-
+export class AppComponent {
   public readonly activeTab: WritableSignal<'feed' | 'admin' | 'logs' | 'alerts'> = signal<'feed' | 'admin' | 'logs' | 'alerts'>('feed');
+  public readonly isAccountMenuOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -36,34 +34,24 @@ export class AppComponent implements AfterViewInit {
     public readonly authService: AuthService,
   ) {}
 
-  public ngAfterViewInit(): void {
-    if (this.headerGoogleBtnRef?.nativeElement) {
-      this.authService.renderGoogleButton(this.headerGoogleBtnRef.nativeElement);
-    }
-  }
-
   public setActiveTab(tab: 'feed' | 'admin' | 'logs' | 'alerts'): void {
     this.activeTab.set(tab);
   }
 
-  public openLoginModal(): void {
-    this.authService.openAuthModal();
-    setTimeout(() => {
-      if (this.modalGoogleBtnRef?.nativeElement) {
-        this.authService.renderGoogleButton(this.modalGoogleBtnRef.nativeElement);
-      }
-    }, 150);
+  public toggleAccountMenu(): void {
+    this.isAccountMenuOpen.update((val) => !val);
   }
 
-  public triggerGoogleSignIn(): void {
-    this.authService.triggerGoogleOAuth();
+  public closeAccountMenu(): void {
+    this.isAccountMenuOpen.set(false);
   }
 
-  public triggerDirectGoogleRedirect(): void {
+  public signOut(): void {
+    this.isAccountMenuOpen.set(false);
+    this.authService.signOut();
+  }
+
+  public loginViaGoogle(): void {
     this.authService.redirectToGoogleOAuth();
-  }
-
-  public triggerOperatorQuickAccess(): void {
-    this.authService.loginWithOperatorClearance();
   }
 }

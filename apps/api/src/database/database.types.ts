@@ -45,9 +45,26 @@ export interface DetectionEventsTable {
 export type DetectionEventRecord = Selectable<DetectionEventsTable>;
 export type NewDetectionEventRecord = Insertable<DetectionEventsTable>;
 
+export interface DetectionLogsTable {
+  id: Generated<string>;
+  station_id: string;
+  station_name: string;
+  frame_index: number;
+  track_id: number;
+  label: string;
+  confidence: number;
+  bbox: string;
+  suspicion_score: number;
+  triggers: string;
+  created_at: Generated<Date>;
+}
+
+export type DetectionLogRecord = Selectable<DetectionLogsTable>;
+export type NewDetectionLogRecord = Insertable<DetectionLogsTable>;
+
 export interface Database {
   alerts: AlertsTable;
   detection_zones: DetectionZonesTable;
   detection_events: DetectionEventsTable;
+  detection_logs: DetectionLogsTable;
 }
-

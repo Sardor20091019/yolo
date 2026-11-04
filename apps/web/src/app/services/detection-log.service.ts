@@ -1,4 +1,5 @@
 import { Injectable, signal, computed, WritableSignal, Signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { BoundingBox } from '../models/detection.model';
 
 export interface UserProfile {
@@ -15,6 +16,8 @@ export interface DetectionLogEntry {
   firstSeen: string;
   lastSeen: string;
   occurrences: number;
+  stationId?: string;
+  suspicionScore?: number;
 }
 
 @Injectable({
@@ -25,6 +28,7 @@ export class DetectionLogService {
   private readonly ACTIVE_USER_STORAGE_KEY: string = 'astro_detection_active_user';
   private readonly LOGS_STORAGE_PREFIX: string = 'astro_detection_logs_';
   private readonly MAX_LOGS_PER_USER: number = 250;
+  private readonly apiBaseUrl: string;
 
   public readonly users: WritableSignal<UserProfile[]> = signal<UserProfile[]>([]);
   public readonly currentUser: WritableSignal<UserProfile> = signal<UserProfile>({
@@ -73,8 +77,13 @@ export class DetectionLogService {
 
   private lastRecordedTimeByLabel: Map<string, number> = new Map<string, number>();
 
-  constructor() {
+  constructor(private readonly http: HttpClient) {
+    const isDev = typeof window !== 'undefined' && window.location.port === '4200';
+    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+    this.apiBaseUrl = isDev ? `http://${host}:3000/api` : '/api';
+
     this.initializeState();
+    this.fetchDatabaseLogs();
   }
 
   private initializeState(): void {
@@ -92,7 +101,7 @@ export class DetectionLogService {
       if (loadedUsers.length === 0) {
         const initialUser: UserProfile = {
           id: 'usr_' + Math.random().toString(36).substring(2, 9),
-          name: 'Primary User',
+          name: 'Primary Operator',
           createdAt: new Date().toISOString(),
         };
         loadedUsers = [initialUser];
@@ -112,12 +121,60 @@ export class DetectionLogService {
     } catch {
       const fallbackUser: UserProfile = {
         id: 'usr_default',
-        name: 'Primary User',
+        name: 'Primary Operator',
         createdAt: new Date().toISOString(),
       };
       this.users.set([fallbackUser]);
       this.currentUser.set(fallbackUser);
     }
+  }
+
+  public fetchDatabaseLogs(): void {
+    this.http.get<any[]>(`${this.apiBaseUrl}/detection/logs?limit=150`).subscribe({
+      next: (records) => {
+        if (!Array.isArray(records) || records.length === 0) {
+          return;
+        }
+
+        const map = new Map<string, DetectionLogEntry>();
+        const existingLogs = this.logs();
+        existingLogs.forEach((l) => map.set(l.label.toLowerCase(), { ...l }));
+
+        records.forEach((r) => {
+          const lbl = (r.label || '').toLowerCase();
+          if (!lbl) return;
+          const ex = map.get(lbl);
+          const createdAt = r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString();
+          if (ex) {
+            ex.occurrences += 1;
+            ex.confidence = Math.max(ex.confidence, r.confidence || 0);
+            if (createdAt > ex.lastSeen) {
+              ex.lastSeen = createdAt;
+            }
+            if (createdAt < ex.firstSeen) {
+              ex.firstSeen = createdAt;
+            }
+          } else {
+            map.set(lbl, {
+              id: r.id || 'db_' + Math.random().toString(36).substring(2, 8),
+              userId: this.currentUser().id,
+              label: r.label,
+              confidence: r.confidence || 0.9,
+              firstSeen: createdAt,
+              lastSeen: createdAt,
+              occurrences: 1,
+              stationId: r.station_id,
+              suspicionScore: r.suspicion_score,
+            });
+          }
+        });
+
+        const merged = Array.from(map.values()).sort((a, b) => (b.lastSeen > a.lastSeen ? 1 : -1));
+        this.logs.set(merged);
+        this.persistLogs(this.currentUser().id, merged);
+      },
+      error: () => {},
+    });
   }
 
   public loadLogsForUser(userId: string): void {
@@ -149,6 +206,22 @@ export class DetectionLogService {
     const isoString = new Date().toISOString();
     let currentLogs = [...this.logs()];
     let hasModifications = false;
+
+    const dbPayload = boxes.map((b) => ({
+      station_id: 'CCTV-NODE-01',
+      station_name: user.name,
+      frame_index: 0,
+      track_id: b.trackId || 0,
+      label: b.label,
+      confidence: b.confidence || 0.9,
+      bbox: JSON.stringify(b.bbox || []),
+      suspicion_score: 0,
+      triggers: '[]',
+    }));
+
+    this.http.post(`${this.apiBaseUrl}/detection/logs`, dbPayload).subscribe({
+      error: () => {},
+    });
 
     boxes.forEach((box) => {
       const label = box.label.toLowerCase().trim();
@@ -223,7 +296,7 @@ export class DetectionLogService {
   }
 
   public createUser(name: string): UserProfile {
-    const trimmed = name.trim() || `User ${this.users().length + 1}`;
+    const trimmed = name.trim() || `Operator ${this.users().length + 1}`;
     const newUser: UserProfile = {
       id: 'usr_' + Math.random().toString(36).substring(2, 9),
       name: trimmed,
@@ -285,4 +358,3 @@ export class DetectionLogService {
     downloadAnchor.remove();
   }
 }
-

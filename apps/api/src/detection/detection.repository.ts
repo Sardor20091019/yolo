@@ -6,6 +6,8 @@ import {
   DetectionZoneUpdateRecord,
   DetectionEventRecord,
   NewDetectionEventRecord,
+  DetectionLogRecord,
+  NewDetectionLogRecord,
 } from '../database/database.types';
 import { sql } from 'kysely';
 
@@ -85,5 +87,32 @@ export class DetectionRepository {
       .limit(limit)
       .execute();
   }
-}
 
+  public async createDetectionLog(record: NewDetectionLogRecord): Promise<DetectionLogRecord> {
+    return await this.databaseService.db
+      .insertInto('detection_logs')
+      .values(record)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
+  public async createDetectionLogsBatch(records: NewDetectionLogRecord[]): Promise<DetectionLogRecord[]> {
+    if (!records || records.length === 0) {
+      return [];
+    }
+    return await this.databaseService.db
+      .insertInto('detection_logs')
+      .values(records)
+      .returningAll()
+      .execute();
+  }
+
+  public async getRecentDetectionLogs(limit: number = 100): Promise<DetectionLogRecord[]> {
+    return await this.databaseService.db
+      .selectFrom('detection_logs')
+      .selectAll()
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .execute();
+  }
+}

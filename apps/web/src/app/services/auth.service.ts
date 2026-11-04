@@ -28,8 +28,7 @@ export class AuthService {
   });
 
   public readonly isAdmin: Signal<boolean> = computed(() => {
-    const user = this.currentUser();
-    return user !== null;
+    return this.currentUser() !== null;
   });
 
   constructor(private readonly http: HttpClient) {
@@ -85,7 +84,7 @@ export class AuthService {
         },
         error: () => {
           this.isAuthenticating.set(false);
-          this.authErrorMessage.set('Google token authentication failed.');
+          this.authErrorMessage.set('Google authentication failed.');
         },
       });
     }
@@ -96,125 +95,13 @@ export class AuthService {
       next: (res) => {
         if (res && res.googleClientId) {
           this.googleClientId.set(res.googleClientId);
-          this.initGoogleIdentitySdk(res.googleClientId);
         }
       },
       error: () => {
         const fallback = '1002685554488-10r19m3kgt1o89ocoup8id1bjo1a2o6v.apps.googleusercontent.com';
         this.googleClientId.set(fallback);
-        this.initGoogleIdentitySdk(fallback);
       },
     });
-  }
-
-  public initGoogleIdentitySdk(clientId: string): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const w = window as any;
-    if (!w.google?.accounts?.id) {
-      setTimeout(() => this.initGoogleIdentitySdk(clientId), 500);
-      return;
-    }
-
-    try {
-      w.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response: { credential: string }) => {
-          if (response && response.credential) {
-            this.isAuthenticating.set(true);
-            this.verifyGoogleCredentialOnBackend(response.credential).subscribe({
-              next: () => {
-                this.isAuthenticating.set(false);
-                this.isAuthModalOpen.set(false);
-                this.authErrorMessage.set('');
-              },
-              error: () => {
-                this.isAuthenticating.set(false);
-                this.authErrorMessage.set('Server verification failed for Google credential.');
-              },
-            });
-          }
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-    } catch {
-      return;
-    }
-  }
-
-  public renderGoogleButton(element: HTMLElement): void {
-    if (typeof window === 'undefined' || !element) {
-      return;
-    }
-    const w = window as any;
-    if (w.google?.accounts?.id) {
-      try {
-        w.google.accounts.id.renderButton(element, {
-          theme: 'filled_black',
-          size: 'large',
-          type: 'standard',
-          shape: 'pill',
-          text: 'signin_with',
-          width: 280,
-        });
-      } catch {
-      }
-    } else {
-      setTimeout(() => this.renderGoogleButton(element), 400);
-    }
-  }
-
-  public triggerGoogleOAuth(): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const w = window as any;
-    const clientId = this.googleClientId();
-    this.authErrorMessage.set('');
-
-    if (w.google?.accounts?.oauth2?.initTokenClient) {
-      try {
-        const tokenClient = w.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'email profile openid',
-          callback: (tokenResponse: any) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              this.isAuthenticating.set(true);
-              this.verifyGoogleCredentialOnBackend(tokenResponse.access_token).subscribe({
-                next: () => {
-                  this.isAuthenticating.set(false);
-                  this.isAuthModalOpen.set(false);
-                  this.authErrorMessage.set('');
-                },
-                error: () => {
-                  this.isAuthenticating.set(false);
-                  this.authErrorMessage.set('Token validation rejected by surveillance server.');
-                },
-              });
-            } else if (tokenResponse && tokenResponse.error) {
-              this.authErrorMessage.set(`Google authentication notice: ${tokenResponse.error_description || tokenResponse.error}`);
-            }
-          },
-          error_callback: () => {
-            this.redirectToGoogleOAuth();
-          },
-        });
-        tokenClient.requestAccessToken();
-        return;
-      } catch {
-        this.redirectToGoogleOAuth();
-        return;
-      }
-    }
-
-    if (w.google?.accounts?.id?.prompt) {
-      w.google.accounts.id.prompt();
-      return;
-    }
-
-    this.redirectToGoogleOAuth();
   }
 
   public redirectToGoogleOAuth(): void {
@@ -229,19 +116,8 @@ export class AuthService {
     window.location.href = authUrl;
   }
 
-  public loginWithOperatorClearance(): void {
-    this.isAuthenticating.set(true);
-    this.verifyGoogleCredentialOnBackend('OPERATOR_ROOT_ACCESS').subscribe({
-      next: () => {
-        this.isAuthenticating.set(false);
-        this.isAuthModalOpen.set(false);
-        this.authErrorMessage.set('');
-      },
-      error: () => {
-        this.isAuthenticating.set(false);
-        this.authErrorMessage.set('Failed to verify operator credentials.');
-      },
-    });
+  public loginViaGoogle(): void {
+    this.redirectToGoogleOAuth();
   }
 
   public verifyGoogleCredentialOnBackend(credential: string): Observable<{ user: UserSession; token: string }> {
@@ -266,10 +142,6 @@ export class AuthService {
     this.currentUser.set(null);
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.removeItem(this.STORAGE_KEY);
-    }
-    const w = window as any;
-    if (w.google?.accounts?.id) {
-      w.google.accounts.id.disableAutoSelect();
     }
   }
 
