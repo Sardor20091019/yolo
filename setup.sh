@@ -7,7 +7,7 @@ fi
 
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -r apps/python-worker/requirements.txt
+pip install -r apps/python-worker/requirements-ml.txt
 
 npm install
 

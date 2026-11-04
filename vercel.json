@@ -15,7 +15,8 @@
     },
     "python-worker": {
       "root": "apps/python-worker",
-      "runtime": "python"
+      "runtime": "python",
+      "entrypoint": "index.py"
     },
     "web": {
       "root": "apps/web",
