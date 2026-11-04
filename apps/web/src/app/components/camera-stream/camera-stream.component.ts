@@ -34,6 +34,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public readonly activeDrawPoints: WritableSignal<[number, number][]> = signal<[number, number][]>([]);
   public newZoneName: string = 'Electronics Shelf 1';
   public newZoneDwell: number = 8;
+  public readonly facingMode: WritableSignal<'environment' | 'user'> = signal<'environment' | 'user'>('environment');
 
   private mediaStream: MediaStream | null = null;
   private captureIntervalId: any = null;
@@ -79,14 +80,22 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public async startStream(): Promise<void> {
     if (this.mode() === 'WEBCAM') {
       try {
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        const constraints: MediaStreamConstraints = {
           video: {
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            facingMode: 'user',
+            facingMode: { ideal: this.facingMode() },
           },
           audio: false,
-        });
+        };
+        try {
+          this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch {
+          this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: this.facingMode() } },
+            audio: false,
+          });
+        }
 
         if (this.videoRef?.nativeElement) {
           this.videoRef.nativeElement.srcObject = this.mediaStream;
@@ -101,6 +110,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     } else {
       this.isStreaming.set(true);
       this.startCaptureInterval();
+    }
+  }
+
+  public async toggleCameraFacing(): Promise<void> {
+    const nextFacing = this.facingMode() === 'environment' ? 'user' : 'environment';
+    this.facingMode.set(nextFacing);
+    if (this.isStreaming() && this.mode() === 'WEBCAM') {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach((track) => track.stop());
+        this.mediaStream = null;
+      }
+      await this.startStream();
     }
   }
 

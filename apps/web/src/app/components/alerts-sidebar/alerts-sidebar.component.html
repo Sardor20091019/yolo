@@ -131,12 +131,12 @@
 
   <div
     *ngIf="selectedModalAlert() as modalAlert"
-    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-[#0e1014] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-5 overflow-hidden shadow-2xl">
-      <div class="flex items-center justify-between pb-3.5 border-b border-white/[0.08] mb-4">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-[#0e1014] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-4 sm:p-5 overflow-hidden shadow-2xl my-auto">
+      <div class="flex items-center justify-between pb-3 sm:pb-3.5 border-b border-white/[0.08] mb-3 sm:mb-4">
         <div>
           <span class="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">INCIDENT AUDIT DETAIL</span>
-          <h3 class="text-sm font-semibold font-mono text-zinc-100 mt-0.5">
+          <h3 class="text-xs sm:text-sm font-semibold font-mono text-zinc-100 mt-0.5">
             TRACK ID #{{ modalAlert.track_id }} &bull; {{ modalAlert.suspicion_score }}% RISK
           </h3>
         </div>
@@ -144,30 +144,30 @@
           type="button"
           (click)="closeModal()"
           class="text-zinc-400 hover:text-white font-mono text-xs px-2.5 py-1 rounded-lg bg-white/[0.04] transition-colors">
-          ESC / CLOSE
+          CLOSE
         </button>
       </div>
 
-      <div class="relative bg-black/50 rounded-xl overflow-hidden border border-white/[0.08] mb-4 flex items-center justify-center max-h-[460px]">
+      <div class="relative bg-black/50 rounded-xl overflow-hidden border border-white/[0.08] mb-3 sm:mb-4 flex items-center justify-center max-h-[300px] sm:max-h-[460px]">
         <img
           [src]="getSnapshotUrl(modalAlert.snapshot_url)"
           alt="Incident Snapshot Detail"
-          class="w-full h-auto object-contain max-h-[460px]" />
+          class="w-full h-auto object-contain max-h-[300px] sm:max-h-[460px]" />
       </div>
 
-      <div class="flex items-center justify-between font-mono text-xs pt-1">
-        <span class="text-zinc-500 text-[11px]">CAPTURED: {{ modalAlert.created_at }}</span>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between font-mono text-xs pt-1 gap-2.5">
+        <span class="text-zinc-500 text-[10px] sm:text-[11px] truncate">CAPTURED: {{ modalAlert.created_at }}</span>
         <div class="flex space-x-2">
           <button
             type="button"
             (click)="updateStatus(modalAlert, 'CONFIRMED'); closeModal()"
-            class="px-3 py-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 font-medium rounded-lg transition-colors">
+            class="flex-1 sm:flex-initial px-3 py-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 font-medium rounded-lg transition-colors text-center text-xs">
             CONFIRM THEFT
           </button>
           <button
             type="button"
             (click)="updateStatus(modalAlert, 'DISMISSED'); closeModal()"
-            class="px-3 py-1.5 bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1] rounded-lg transition-colors">
+            class="flex-1 sm:flex-initial px-3 py-1.5 bg-white/[0.06] text-zinc-300 hover:bg-white/[0.1] rounded-lg transition-colors text-center text-xs">
             DISMISS
           </button>
         </div>
