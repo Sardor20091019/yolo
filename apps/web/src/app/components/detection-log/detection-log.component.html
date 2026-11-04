@@ -1,13 +1,12 @@
-<div class="bg-[#07090e] border border-white/[0.08] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col relative">
-  <div class="px-4 sm:px-5 py-3.5 bg-[#0d1017]/90 border-b border-white/[0.08] backdrop-blur-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div class="flex items-center space-x-2.5">
-      <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.8)]"></div>
-      <span class="font-mono text-xs font-bold tracking-widest uppercase text-white">
-        LOCAL ACTIVITY &amp; SURVEILLANCE LOG
-      </span>
-      <span class="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/[0.05] border border-white/[0.08] text-zinc-300">
-        {{ logService.logs().length }} entries
-      </span>
+<div class="flex flex-col border hairline overflow-hidden" style="border-radius:2px; background:#0b0b09">
+
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 border-b hairline gap-3" style="background:#111110">
+    <div class="flex items-center space-x-3">
+      <div class="status-dot" style="background:#3d6b54"></div>
+      <div>
+        <div class="font-mono text-xs font-semibold uppercase tracking-wider" style="color:#d0cdc4; letter-spacing:0.14em">TELEMETRY &amp; DETECTION ARCHIVE</div>
+        <div class="label">PERSISTENT LOCAL SENSOR LOG &bull; {{ logService.logs().length }} ENTRIES</div>
+      </div>
     </div>
 
     <div class="flex items-center space-x-2">
@@ -15,8 +14,9 @@
         <select
           [value]="logService.currentUser().id"
           (change)="handleUserChange($event)"
-          class="bg-black/70 border border-white/[0.1] rounded-xl px-3 py-1 text-xs font-mono text-zinc-200 focus:outline-none focus:border-white/30 cursor-pointer">
-          <option *ngFor="let u of logService.users()" [value]="u.id" class="bg-[#0d1017] text-zinc-200">
+          class="font-mono text-xs py-1 px-2.5 border hairline cursor-pointer"
+          style="border-radius:2px; background:#0b0b09; color:#d0cdc4; outline:none">
+          <option *ngFor="let u of logService.users()" [value]="u.id" style="background:#111110; color:#d0cdc4">
             {{ u.name }}
           </option>
         </select>
@@ -25,71 +25,73 @@
       <button
         type="button"
         (click)="toggleNewUserForm()"
-        class="px-3 py-1 rounded-xl text-xs font-mono bg-white/[0.05] hover:bg-white/[0.12] text-zinc-200 border border-white/[0.1] transition-all"
-        title="Add user profile">
-        + USER
+        class="btn-ghost"
+        style="border-radius:2px"
+        title="Add operator profile">
+        &#43; OPERATOR
       </button>
 
       <button
         *ngIf="logService.users().length > 1"
         type="button"
         (click)="deleteCurrentUser()"
-        class="px-2.5 py-1 rounded-xl text-xs font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all"
-        title="Delete current user profile">
+        class="btn-danger"
+        style="border-radius:2px; padding:0.2rem 0.5rem"
+        title="Delete profile">
         &times;
       </button>
     </div>
   </div>
 
-  <div *ngIf="isCreatingUser()" class="px-4 sm:px-5 py-2.5 bg-black/60 border-b border-white/[0.06] flex items-center gap-2">
+  <div *ngIf="isCreatingUser()" class="px-5 py-2.5 border-b hairline flex items-center gap-2" style="background:#171715">
     <input
       type="text"
       [(ngModel)]="newUserName"
-      placeholder="New user identifier (e.g. Inspector B)"
-      class="flex-1 bg-black/80 border border-white/[0.12] rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30" />
+      placeholder="New operator designation (e.g. Inspector Gamma)..."
+      class="flex-1 font-mono text-xs py-1.5 px-3 border hairline"
+      style="border-radius:2px; background:#0b0b09; color:#d0cdc4; outline:none"/>
     <button
       type="button"
       (click)="submitNewUser()"
-      class="px-4 py-1.5 bg-white text-zinc-950 font-bold text-xs font-mono rounded-xl hover:bg-zinc-200 transition-all shadow-md">
+      class="btn-primary"
+      style="border-radius:2px">
       CREATE
     </button>
     <button
       type="button"
       (click)="toggleNewUserForm()"
-      class="px-3 py-1.5 text-zinc-400 hover:text-white text-xs font-mono transition-colors">
+      class="btn-ghost"
+      style="border-radius:2px">
       CANCEL
     </button>
   </div>
 
-  <div class="grid grid-cols-3 divide-x divide-white/[0.06] border-b border-white/[0.06] bg-black/40">
+  <div class="grid grid-cols-3 divide-x border-b flex-shrink-0" style="border-color:rgba(210,205,195,0.08)">
     <div class="px-4 py-3">
-      <div class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">TOTAL DETECTIONS</div>
-      <div class="text-base font-mono font-bold text-zinc-100 mt-0.5">
-        {{ logService.totalDetectionsCount() }}
-      </div>
+      <div class="label">TOTAL DETECTIONS</div>
+      <div class="metric-num" style="font-size:1.15rem; margin-top:0.25rem">{{ logService.totalDetectionsCount() }}</div>
     </div>
     <div class="px-4 py-3">
-      <div class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">UNIQUE OBJECTS</div>
-      <div class="text-base font-mono font-bold text-emerald-400 mt-0.5">
-        {{ logService.uniqueObjectsCount() }}
-      </div>
+      <div class="label">UNIQUE CLASSES</div>
+      <div class="metric-num" style="font-size:1.15rem; margin-top:0.25rem; color:#3d6b54">{{ logService.uniqueObjectsCount() }}</div>
     </div>
     <div class="px-4 py-3">
-      <div class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">TOP DETECTED</div>
-      <div class="text-xs font-mono font-bold text-amber-300 mt-1 uppercase truncate">
+      <div class="label">PRIMARY CLASSIFICATION</div>
+      <div class="font-mono text-xs font-semibold uppercase tracking-wider truncate" style="color:#a88840; margin-top:0.4rem; letter-spacing:0.1em">
         {{ logService.topDetectedObject() }}
       </div>
     </div>
   </div>
 
-  <div class="px-4 sm:px-5 py-2.5 bg-black/50 border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
+  <div class="px-5 py-2.5 border-b hairline flex flex-wrap items-center justify-between gap-2" style="background:#0b0b09">
     <div class="relative flex-1 min-w-[200px]">
       <input
         type="text"
         [ngModel]="logService.searchTerm()"
         (ngModelChange)="onSearchChange($event)"
-        placeholder="Filter by object name (e.g. phone, keyboard)..."
-        class="w-full bg-black/70 border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/30" />
+        placeholder="Filter telemetry by object class (e.g. person, car)..."
+        class="w-full font-mono text-xs py-1.5 px-3 border hairline"
+        style="border-radius:2px; background:#111110; color:#8c8880; outline:none"/>
     </div>
 
     <div class="flex items-center space-x-2">
@@ -97,7 +99,8 @@
         type="button"
         (click)="logService.exportLogsJson()"
         [disabled]="logService.logs().length === 0"
-        class="px-3 py-1.5 rounded-xl text-[11px] font-mono bg-white/[0.05] hover:bg-white/[0.12] disabled:opacity-40 text-zinc-300 border border-white/[0.08] transition-all shadow-sm">
+        class="btn-ghost disabled:opacity-30"
+        style="border-radius:2px">
         EXPORT JSON
       </button>
 
@@ -105,52 +108,57 @@
         type="button"
         (click)="clearAllLogs()"
         [disabled]="logService.logs().length === 0"
-        class="px-3 py-1.5 rounded-xl text-[11px] font-mono bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-40 text-rose-300 border border-rose-500/30 transition-all">
+        class="btn-danger disabled:opacity-30"
+        style="border-radius:2px">
         CLEAR
       </button>
     </div>
   </div>
 
-  <div class="flex-1 overflow-y-auto max-h-[380px] p-3 space-y-2 font-mono">
-    <div *ngIf="logService.filteredLogs().length === 0" class="py-14 text-center text-zinc-600 text-xs">
-      <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-zinc-500">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-      </div>
-      <span class="tracking-wider uppercase font-bold text-zinc-400">No detections logged for {{ logService.currentUser().name }}.</span>
-      <div class="text-[11px] text-zinc-600 mt-1 max-w-sm mx-auto font-sans">Activate the camera feed to record real-time detected objects into persistent local telemetry.</div>
+  <div class="flex-1 overflow-y-auto max-h-[380px] p-3 space-y-2">
+
+    <div *ngIf="logService.filteredLogs().length === 0" class="py-14 text-center">
+      <svg class="w-8 h-8 mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="#2e2c29" stroke-width="1.25">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+      </svg>
+      <div class="label" style="letter-spacing:0.14em">NO TELEMETRY RECORDED FOR {{ logService.currentUser().name | uppercase }}</div>
+      <div class="text-xs font-sans mt-1" style="color:#3a3835">Activate the camera stream to record real-time detected objects into local telemetry.</div>
     </div>
 
     <div
       *ngFor="let item of logService.filteredLogs()"
-      class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] transition-all">
+      class="flex items-center justify-between p-3 border hairline transition-colors"
+      style="border-radius:2px; background:#111110"
+      onmouseover="this.style.borderColor='rgba(210,205,195,0.2)'"
+      onmouseout="this.style.borderColor='rgba(210,205,195,0.08)'">
+
       <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-bold">
+        <div class="w-7 h-7 flex items-center justify-center font-mono text-xs border hairline" style="border-radius:2px; background:#171715; color:#a88840">
           {{ item.label.slice(0, 1).toUpperCase() }}
         </div>
         <div>
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold text-white uppercase tracking-wider">
+            <span class="font-mono text-xs font-medium uppercase tracking-wider" style="color:#d0cdc4; letter-spacing:0.1em">
               {{ item.label }}
             </span>
-            <span class="px-2 py-0.5 rounded-md text-[9px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+            <span class="tag tag-green" style="border-radius:2px; font-size:0.55rem">
               {{ roundConfidence(item.confidence) }}% CONF
             </span>
           </div>
-          <div class="text-[10px] text-zinc-500 flex items-center space-x-2 mt-0.5">
-            <span>First: {{ formatTime(item.firstSeen) }}</span>
-            <span class="text-zinc-700">&bull;</span>
-            <span>Last: {{ formatTime(item.lastSeen) }}</span>
+          <div class="label flex items-center space-x-2 mt-0.5">
+            <span>FIRST {{ formatTime(item.firstSeen) }}</span>
+            <span>&bull;</span>
+            <span>LAST {{ formatTime(item.lastSeen) }}</span>
           </div>
         </div>
       </div>
 
       <div class="text-right">
-        <span class="px-2.5 py-1 rounded-lg text-[10px] bg-black/60 text-zinc-300 border border-white/[0.08] font-bold">
-          &times;{{ item.occurrences }} sightings
+        <span class="tag" style="border-radius:2px; font-size:0.6rem">
+          &times;{{ item.occurrences }} SIGHTINGS
         </span>
       </div>
     </div>
+
   </div>
 </div>
