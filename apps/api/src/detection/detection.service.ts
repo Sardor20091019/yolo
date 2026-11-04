@@ -107,6 +107,12 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private startPythonWorker(): void {
+    const workerUrl = process.env.PYTHON_WORKER_URL || this.configService.get<string>('python.workerUrl');
+    if (workerUrl) {
+      this.logger.log(`Using bound python-worker service at ${workerUrl}`);
+      return;
+    }
+
     const pythonBin = this.configService.get<string>('python.binPath', 'python3');
     const configuredScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
     const workerScript = this.resolveWorkerScriptPath(configuredScript);
@@ -214,6 +220,29 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         nervousCheckSensitivity: this.activeConfig.nervousCheckSensitivity,
       },
     };
+
+    const workerUrl = process.env.PYTHON_WORKER_URL || this.configService.get<string>('python.workerUrl');
+    if (workerUrl) {
+      try {
+        const targetUrl = new URL('/', workerUrl).toString();
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const workerResult = (await response.json()) as FrameProcessingResult;
+          await this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData);
+          return workerResult;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to call bound python-worker service at ${workerUrl}: ${msg}`);
+      }
+    }
 
     const result = await new Promise<FrameProcessingResult>((resolve) => {
       if (!this.pythonProcess || this.pythonProcess.killed || !this.pythonProcess.stdin.writable) {

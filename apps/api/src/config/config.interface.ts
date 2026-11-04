@@ -14,6 +14,7 @@ export interface AppConfig {
     workerPath: string;
     workerHost: string;
     workerPort: number;
+    workerUrl: string;
   };
   yolo: {
     detectionModel: string;

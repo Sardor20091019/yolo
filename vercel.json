@@ -1,16 +1,39 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "apps/web/dist/web/browser",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": "apps/api",
+      "framework": "nestjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "python-worker",
+          "format": "url",
+          "env": "PYTHON_WORKER_URL"
+        }
+      ]
+    },
+    "python-worker": {
+      "root": "apps/python-worker",
+      "runtime": "python"
+    },
+    "web": {
+      "root": "apps/web",
+      "framework": "angular"
+    }
+  },
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
     },
     {
-      "source": "/((?!api|.*\\..*).*)",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
     }
   ]
 }
-

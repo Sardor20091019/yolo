@@ -16,6 +16,7 @@ export default (): AppConfig => ({
     workerPath: process.env.PYTHON_WORKER_PATH || 'apps/python-worker/main.py',
     workerHost: process.env.PYTHON_WORKER_HOST || '127.0.0.1',
     workerPort: parseInt(process.env.PYTHON_WORKER_PORT || '5001', 10),
+    workerUrl: process.env.PYTHON_WORKER_URL || '',
   },
   yolo: {
     detectionModel: process.env.YOLO_DETECTION_MODEL || 'yolo26m.pt',
