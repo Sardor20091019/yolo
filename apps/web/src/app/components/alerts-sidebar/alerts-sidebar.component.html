@@ -1,0 +1,175 @@
+<div class="flex flex-col h-full bg-[#111726] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
+  <div class="px-4 py-3 bg-[#0a0d14]/80 border-b border-[#1f293d] flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <span class="w-2 h-2 rounded-full bg-[#ff2a5f] animate-ping"></span>
+      <h2 class="font-mono text-xs font-bold tracking-wider uppercase text-slate-200">
+        INCIDENT LOGS & AUDIT
+      </h2>
+    </div>
+    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#ff2a5f]/20 text-[#ff2a5f] border border-[#ff2a5f]/40">
+      {{ alertsService.metrics().highRiskCount }} CRITICAL
+    </span>
+  </div>
+
+  <div class="grid grid-cols-3 gap-2 p-3 bg-[#0d121d] border-b border-[#1f293d] text-center font-mono">
+    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
+      <div class="text-[10px] text-slate-500 uppercase">TOTAL</div>
+      <div class="text-sm font-bold text-slate-200">{{ alertsService.metrics().total }}</div>
+    </div>
+    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
+      <div class="text-[10px] text-slate-500 uppercase">UNREVIEWED</div>
+      <div class="text-sm font-bold text-[#ffb800]">{{ alertsService.metrics().newCount }}</div>
+    </div>
+    <div class="bg-[#0a0d14] p-2 rounded border border-[#1f293d]">
+      <div class="text-[10px] text-slate-500 uppercase">CONFIRMED</div>
+      <div class="text-sm font-bold text-[#ff2a5f]">{{ alertsService.metrics().confirmedCount }}</div>
+    </div>
+  </div>
+
+  <div class="flex border-b border-[#1f293d] bg-[#0a0d14] p-1 text-xs font-mono">
+    <button
+      *ngFor="let tab of ['ALL', 'NEW', 'CONFIRMED', 'DISMISSED']"
+      type="button"
+      (click)="setFilter(tab)"
+      [ngClass]="activeFilter() === tab ? 'bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/40' : 'text-slate-400 hover:text-slate-200'"
+      class="flex-1 py-1 text-center rounded transition text-[11px]">
+      {{ tab }}
+    </button>
+  </div>
+
+  <div class="flex-1 overflow-y-auto p-3 space-y-3">
+    <div *ngIf="alertsService.alerts().length === 0" class="h-48 flex flex-col items-center justify-center text-slate-600 font-mono text-xs">
+      <svg class="w-8 h-8 mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <span>NO INCIDENTS RECORDED</span>
+    </div>
+
+    <div
+      *ngFor="let alert of alertsService.alerts()"
+      class="bg-[#0a0d14] border border-[#1f293d] rounded-lg overflow-hidden transition hover:border-[#ff2a5f]/50">
+      
+      <div class="p-3">
+        <div class="flex items-start justify-between mb-2">
+          <div class="flex items-center space-x-2">
+            <span
+              [ngClass]="alert.suspicion_score >= 75 ? 'bg-[#ff2a5f]/20 text-[#ff2a5f] border-[#ff2a5f]/40' : 'bg-[#ffb800]/20 text-[#ffb800] border-[#ffb800]/40'"
+              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border">
+              {{ alert.suspicion_score }}% RISK
+            </span>
+            <span class="font-mono text-xs font-bold text-slate-200">TRACK #{{ alert.track_id }}</span>
+          </div>
+          <span class="font-mono text-[10px] text-slate-500">{{ formatTime(alert.created_at) }}</span>
+        </div>
+
+        <div class="text-xs font-mono font-semibold text-slate-300 mb-1.5">
+          {{ alert.type.replace('_', ' ') }}
+        </div>
+
+        <div *ngIf="parseDetails(alert.details) as d" class="space-y-1 mb-2">
+          <div *ngFor="let trig of d.triggers" class="text-[11px] font-mono text-[#ff2a5f] flex items-center space-x-1">
+            <span>&bull;</span>
+            <span>{{ trig }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="alert.snapshot_url" class="relative group cursor-pointer mb-2 rounded overflow-hidden border border-[#1f293d]" (click)="openModal(alert)">
+          <img
+            [src]="getSnapshotUrl(alert.snapshot_url)"
+            alt="Incident Snapshot"
+            class="w-full h-24 object-cover group-hover:scale-105 transition" />
+          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs font-mono text-white">
+            CLICK TO INSPECT
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-[#1f293d]/60 font-mono text-[10px]">
+          <div class="flex items-center space-x-1">
+            <span class="text-slate-500">STATUS:</span>
+            <span
+              [ngClass]="{
+                'text-[#ffb800]': alert.status === 'NEW',
+                'text-[#00e599]': alert.status === 'REVIEWED',
+                'text-[#ff2a5f]': alert.status === 'CONFIRMED',
+                'text-slate-500': alert.status === 'DISMISSED'
+              }"
+              class="font-bold">
+              {{ alert.status }}
+            </span>
+          </div>
+
+          <div class="flex items-center space-x-1">
+            <button
+              *ngIf="alert.status === 'NEW'"
+              type="button"
+              (click)="updateStatus(alert, 'CONFIRMED')"
+              class="px-2 py-0.5 rounded bg-[#ff2a5f]/20 text-[#ff2a5f] hover:bg-[#ff2a5f]/30 border border-[#ff2a5f]/40">
+              CONFIRM
+            </button>
+            <button
+              *ngIf="alert.status === 'NEW'"
+              type="button"
+              (click)="updateStatus(alert, 'DISMISSED')"
+              class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
+              DISMISS
+            </button>
+            <button
+              type="button"
+              (click)="deleteAlert(alert)"
+              class="p-0.5 text-slate-600 hover:text-[#ff2a5f]">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    *ngIf="selectedModalAlert() as modalAlert"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#111726] border border-[#1f293d] rounded-xl max-w-2xl w-full p-4 overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#1f293d] mb-4">
+        <div>
+          <span class="font-mono text-xs text-[#00f0ff] uppercase tracking-wider">INCIDENT SNAPSHOT AUDIT</span>
+          <h3 class="text-sm font-bold font-mono text-slate-100">
+            TRACK ID #{{ modalAlert.track_id }} - {{ modalAlert.suspicion_score }}% RISK
+          </h3>
+        </div>
+        <button
+          type="button"
+          (click)="closeModal()"
+          class="text-slate-400 hover:text-white font-mono text-sm px-2 py-1">
+          &times; CLOSE
+        </button>
+      </div>
+
+      <div class="relative bg-black rounded-lg overflow-hidden border border-[#1f293d] mb-4 flex items-center justify-center max-h-[480px]">
+        <img
+          [src]="getSnapshotUrl(modalAlert.snapshot_url)"
+          alt="High Resolution Incident Snapshot"
+          class="w-full h-auto object-contain max-h-[480px]" />
+      </div>
+
+      <div class="flex items-center justify-between font-mono text-xs">
+        <span class="text-slate-500">TIMESTAMP: {{ modalAlert.created_at }}</span>
+        <div class="flex space-x-2">
+          <button
+            type="button"
+            (click)="updateStatus(modalAlert, 'CONFIRMED'); closeModal()"
+            class="px-3 py-1 bg-[#ff2a5f] text-white font-bold rounded">
+            CONFIRM THEFT
+          </button>
+          <button
+            type="button"
+            (click)="updateStatus(modalAlert, 'DISMISSED'); closeModal()"
+            class="px-3 py-1 bg-slate-800 text-slate-300 rounded">
+            DISMISS
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

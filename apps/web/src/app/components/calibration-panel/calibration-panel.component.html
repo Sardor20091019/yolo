@@ -1,0 +1,135 @@
+<div class="flex flex-col h-full bg-[#111726] border border-[#1f293d] rounded-xl overflow-hidden shadow-2xl">
+  <div class="px-4 py-3 bg-[#0a0d14]/80 border-b border-[#1f293d] flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <svg class="w-4 h-4 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+      </svg>
+      <h2 class="font-mono text-xs font-bold tracking-wider uppercase text-slate-200">
+        AI HEURISTICS CALIBRATION
+      </h2>
+    </div>
+    <span *ngIf="saveSuccess()" class="text-[10px] font-mono text-[#00e599] font-bold animate-pulse">
+      SYNCED
+    </span>
+  </div>
+
+  <div class="p-4 space-y-4 flex-1 overflow-y-auto font-mono text-xs">
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-400">DETECTION CONFIDENCE:</span>
+        <span class="text-[#00f0ff] font-bold">{{ confidenceThreshold }}</span>
+      </div>
+      <input
+        type="range"
+        min="0.10"
+        max="0.95"
+        step="0.05"
+        [(ngModel)]="confidenceThreshold"
+        (change)="onSliderChange()"
+        class="w-full accent-[#00f0ff] bg-[#0a0d14] rounded-lg cursor-pointer h-1.5" />
+      <div class="flex justify-between text-[10px] text-slate-600 mt-0.5">
+        <span>0.10 (High Recall)</span>
+        <span>0.95 (High Precision)</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-400">SUSPICION ALERT THRESHOLD:</span>
+        <span class="text-[#ff2a5f] font-bold">{{ suspicionThreshold }}%</span>
+      </div>
+      <input
+        type="range"
+        min="30"
+        max="95"
+        step="5"
+        [(ngModel)]="suspicionThreshold"
+        (change)="onSliderChange()"
+        class="w-full accent-[#ff2a5f] bg-[#0a0d14] rounded-lg cursor-pointer h-1.5" />
+      <div class="flex justify-between text-[10px] text-slate-600 mt-0.5">
+        <span>30% (Sensitive)</span>
+        <span>95% (Critical only)</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-400">SHELF DWELL LIMIT (LOITERING):</span>
+        <span class="text-[#ffb800] font-bold">{{ loiteringThresholdSeconds }}s</span>
+      </div>
+      <input
+        type="range"
+        min="3"
+        max="30"
+        step="1"
+        [(ngModel)]="loiteringThresholdSeconds"
+        (change)="onSliderChange()"
+        class="w-full accent-[#ffb800] bg-[#0a0d14] rounded-lg cursor-pointer h-1.5" />
+      <div class="flex justify-between text-[10px] text-slate-600 mt-0.5">
+        <span>3s (Fast)</span>
+        <span>30s (Extended)</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-slate-400">NERVOUS CHECK SENSITIVITY:</span>
+        <span class="text-[#00e599] font-bold">{{ nervousCheckSensitivity }}x entries</span>
+      </div>
+      <input
+        type="range"
+        min="1"
+        max="6"
+        step="1"
+        [(ngModel)]="nervousCheckSensitivity"
+        (change)="onSliderChange()"
+        class="w-full accent-[#00e599] bg-[#0a0d14] rounded-lg cursor-pointer h-1.5" />
+      <div class="flex justify-between text-[10px] text-slate-600 mt-0.5">
+        <span>1x entry</span>
+        <span>6x entries</span>
+      </div>
+    </div>
+
+    <div class="pt-3 border-t border-[#1f293d]">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-slate-300 font-bold uppercase text-[11px]">ACTIVE SHELF ROI ZONES:</span>
+        <span class="text-slate-500 text-[10px]">TOTAL: {{ detectionApi.zones().length }}</span>
+      </div>
+
+      <div *ngIf="detectionApi.zones().length === 0" class="p-3 bg-[#0a0d14] rounded border border-[#1f293d] text-center text-slate-600 text-[11px]">
+        No shelf zones configured. Use the "+ DEFINE SHELF ROI" tool on the video feed.
+      </div>
+
+      <div class="space-y-1.5 max-h-36 overflow-y-auto">
+        <div
+          *ngFor="let zone of detectionApi.zones()"
+          class="flex items-center justify-between p-2 bg-[#0a0d14] border border-[#1f293d] rounded">
+          <div class="flex items-center space-x-2">
+            <span
+              [ngClass]="zone.is_active ? 'bg-[#00e599]' : 'bg-slate-600'"
+              class="w-2 h-2 rounded-full">
+            </span>
+            <span class="text-slate-200 font-semibold">{{ zone.name }}</span>
+            <span class="text-slate-500 text-[10px]">({{ zone.dwell_time_threshold }}s)</span>
+          </div>
+
+          <div class="flex items-center space-x-1">
+            <button
+              type="button"
+              (click)="toggleZoneActive(zone)"
+              [ngClass]="zone.is_active ? 'text-[#00e599]' : 'text-slate-500'"
+              class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800">
+              {{ zone.is_active ? 'ON' : 'OFF' }}
+            </button>
+            <button
+              type="button"
+              (click)="deleteZone(zone)"
+              class="text-slate-600 hover:text-[#ff2a5f] p-1">
+              &times;
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

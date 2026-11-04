@@ -1,0 +1,63 @@
+<div class="min-h-screen bg-[#0a0d14] flex flex-col text-slate-100 font-sans">
+  <header class="bg-[#111726]/90 border-b border-[#1f293d] px-6 py-3.5 backdrop-blur-md sticky top-0 z-40">
+    <div class="flex items-center justify-between max-w-7xl mx-auto w-full">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#00f0ff]/20 to-[#ff2a5f]/20 border border-[#00f0ff]/40 flex items-center justify-center">
+          <svg class="w-5 h-5 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-sm font-mono font-bold tracking-wider text-white">
+              AI REAL-TIME SHOPLIFTING & SUSPICIOUS BEHAVIOR DETECTION
+            </h1>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#00f0ff]/10 text-[#00f0ff] border border-[#00f0ff]/30">
+              v1.0 MONOREPO
+            </span>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400">
+            Ultralytics YOLO26/11-Pose &bull; ByteTrack &bull; Pocket Concealment &bull; Nervous Waist Check &bull; Shelf Loitering
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2 font-mono text-xs px-3 py-1.5 rounded-lg bg-[#0a0d14] border border-[#1f293d]">
+          <span class="w-2 h-2 rounded-full" [ngClass]="wsService.isConnected() ? 'bg-[#00e599] animate-pulse' : 'bg-[#ff2a5f]'"></span>
+          <span class="text-slate-400">WS GATEWAY:</span>
+          <span [ngClass]="wsService.isConnected() ? 'text-[#00e599]' : 'text-[#ff2a5f]'" class="font-bold">
+            {{ wsService.isConnected() ? 'ONLINE' : 'CONNECTING...' }}
+          </span>
+        </div>
+
+        <div class="hidden md:flex items-center space-x-2 font-mono text-xs px-3 py-1.5 rounded-lg bg-[#0a0d14] border border-[#1f293d]">
+          <span class="w-2 h-2 rounded-full bg-[#00f0ff]"></span>
+          <span class="text-slate-400">DB:</span>
+          <span class="text-[#00f0ff] font-bold">NEON PG (KYSELY)</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-8 flex flex-col space-y-6">
+      <div class="h-[520px]">
+        <app-camera-stream></app-camera-stream>
+      </div>
+
+      <div>
+        <app-calibration-panel></app-calibration-panel>
+      </div>
+    </div>
+
+    <div class="lg:col-span-4 h-full min-h-[600px]">
+      <app-alerts-sidebar></app-alerts-sidebar>
+    </div>
+  </main>
+
+  <footer class="bg-[#0d121d] border-t border-[#1f293d] px-6 py-2.5 text-center font-mono text-[11px] text-slate-500">
+    ArgusAI Computer Vision Security System &bull; NestJS Kysely PostgreSQL Backend &bull; Angular Standalone Signals Frontend
+  </footer>
+</div>
