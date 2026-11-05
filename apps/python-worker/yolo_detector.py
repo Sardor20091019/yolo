@@ -6,7 +6,7 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 import base64
 import time
 import math
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Any, Tuple, Optional
 from heuristics_engine import ShopliftingHeuristicsEngine
 
@@ -58,7 +58,7 @@ class YoloShopliftingDetector:
         self.np = None
         self.has_ultralytics = False
         self.simulation_step = 0
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         self.initialize_models(
             detection_model_path,
