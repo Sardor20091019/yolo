@@ -6,6 +6,7 @@ import { DetectionLogComponent } from './components/detection-log/detection-log.
 import { WebSocketService } from './services/websocket.service';
 import { DetectionLogService } from './services/detection-log.service';
 import { AuthService } from './services/auth.service';
+import { ThemeService } from './services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -26,6 +27,7 @@ export class AppComponent {
     public readonly wsService: WebSocketService,
     public readonly logService: DetectionLogService,
     public readonly authService: AuthService,
+    public readonly themeService: ThemeService,
   ) {}
 
   public setActiveTab(tab: 'feed' | 'logs'): void {

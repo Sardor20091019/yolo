@@ -7,9 +7,13 @@
     border-color: rgba(210, 205, 195, 0.08);
   }
 
+  html.light *, html.light *::before, html.light *::after {
+    border-color: rgba(15, 23, 42, 0.08);
+  }
+
   ::selection {
-    background: rgba(168, 136, 64, 0.3);
-    color: #f5f3ef;
+    background: rgba(16, 185, 129, 0.25);
+    color: #ffffff;
   }
 
   body {
@@ -22,11 +26,21 @@
     overflow-x: hidden;
     user-select: none;
     background-image:
-      radial-gradient(circle at 50% 0%, rgba(168, 136, 64, 0.035) 0%, transparent 55%),
+      radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.035) 0%, transparent 55%),
       linear-gradient(rgba(210, 205, 195, 0.018) 1px, transparent 1px),
       linear-gradient(90deg, rgba(210, 205, 195, 0.018) 1px, transparent 1px);
     background-size: 100% 100%, 40px 40px, 40px 40px;
     background-position: 0 0, -1px -1px, -1px -1px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  html.light body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.04) 0%, transparent 55%),
+      linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
   }
 
   code, pre, .mono {
@@ -41,7 +55,11 @@
     font-weight: 500;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #524f4b;
+    color: #8c8880;
+  }
+
+  html.light .label {
+    color: #64748b;
   }
 
   .tag {
@@ -58,22 +76,34 @@
     background: rgba(210, 205, 195, 0.02);
   }
 
-  .tag-amber {
-    border-color: rgba(168, 136, 64, 0.35);
-    color: #a88840;
-    background: rgba(168, 136, 64, 0.06);
+  html.light .tag {
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #475569;
+    background: rgba(15, 23, 42, 0.04);
   }
 
   .tag-green {
-    border-color: rgba(61, 107, 84, 0.4);
-    color: #3d6b54;
-    background: rgba(61, 107, 84, 0.08);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+  }
+
+  html.light .tag-green {
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #059669;
+    background: rgba(16, 185, 129, 0.08);
   }
 
   .tag-red {
-    border-color: rgba(122, 66, 66, 0.4);
-    color: #7a4242;
-    background: rgba(122, 66, 66, 0.08);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  html.light .tag-red {
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #dc2626;
+    background: rgba(239, 68, 68, 0.08);
   }
 
   .panel {
@@ -81,17 +111,17 @@
     border: 1px solid rgba(210, 205, 195, 0.08);
   }
 
-  .panel-elevated {
-    background: #171715;
-    border: 1px solid rgba(210, 205, 195, 0.08);
+  html.light .panel {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
   }
 
   .hairline {
     border-color: rgba(210, 205, 195, 0.08);
   }
 
-  .hairline-sm {
-    border-color: rgba(210, 205, 195, 0.04);
+  html.light .hairline {
+    border-color: rgba(15, 23, 42, 0.08);
   }
 
   .metric-num {
@@ -104,23 +134,15 @@
     letter-spacing: -0.02em;
   }
 
+  html.light .metric-num {
+    color: #0f172a;
+  }
+
   .status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
-  }
-
-  .status-live {
-    background: #3d6b54;
-  }
-
-  .status-online {
-    background: #524f4b;
-  }
-
-  .status-offline {
-    background: #2e2c29;
   }
 
   .btn-ghost {
@@ -143,6 +165,18 @@
     background: rgba(210, 205, 195, 0.04);
   }
 
+  html.light .btn-ghost {
+    color: #475569;
+    border-color: rgba(15, 23, 42, 0.14);
+    background: #ffffff;
+  }
+
+  html.light .btn-ghost:hover {
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.28);
+    background: #f1f5f9;
+  }
+
   .btn-primary {
     padding: 0.45rem 1rem;
     font-family: 'IBM Plex Mono', monospace;
@@ -151,15 +185,16 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: #0b0b09;
-    background: #a88840;
-    border: 1px solid #a88840;
-    transition: background 0.15s, border-color 0.15s;
+    background: #10b981;
+    border: 1px solid #10b981;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
     cursor: pointer;
   }
 
   .btn-primary:hover {
-    background: #bd9a48;
-    border-color: #bd9a48;
+    background: #059669;
+    border-color: #059669;
+    color: #ffffff;
   }
 
   .btn-danger {
@@ -169,16 +204,16 @@
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #7a4242;
-    border: 1px solid rgba(122, 66, 66, 0.35);
-    background: rgba(122, 66, 66, 0.06);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.06);
     transition: background 0.15s, border-color 0.15s;
     cursor: pointer;
   }
 
   .btn-danger:hover {
-    background: rgba(122, 66, 66, 0.14);
-    border-color: rgba(122, 66, 66, 0.5);
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.5);
   }
 }
 
@@ -199,22 +234,12 @@
   background: rgba(210, 205, 195, 0.2);
 }
 
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  background: rgba(210, 205, 195, 0.08);
-  height: 2px;
-  border-radius: 0;
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.14);
 }
 
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 0;
-  background: #a88840;
-  cursor: pointer;
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.28);
 }
 
 @keyframes live-pulse {
@@ -227,10 +252,14 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 input::placeholder {
-  color: #3d3b37;
+  color: #524f4b;
+}
+
+html.light input::placeholder {
+  color: #94a3b8;
 }
 
 input:focus, select:focus {
   outline: none;
-  border-color: rgba(168, 136, 64, 0.4) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
 }

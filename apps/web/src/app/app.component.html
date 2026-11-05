@@ -1,21 +1,21 @@
-<div class="min-h-screen bg-obs-bg flex flex-col font-sans" style="color:#d0cdc4">
+<div class="min-h-screen bg-slate-50 dark:bg-[#0b0b09] text-slate-800 dark:text-[#d0cdc4] flex flex-col font-sans transition-colors duration-200">
 
-  <header class="border-b hairline sticky top-0 z-40" style="background:rgba(11,11,9,0.95); backdrop-filter:blur(12px)">
+  <header class="border-b hairline sticky top-0 z-40 bg-white/95 dark:bg-[#0b0b09]/95 backdrop-blur-md transition-colors duration-200">
     <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
 
       <div class="flex items-center space-x-6">
         <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 flex items-center justify-center border hairline" style="background:#141412; border-radius:4px">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+          <div class="w-8 h-8 flex items-center justify-center border hairline bg-slate-100 dark:bg-[#141412] rounded">
+            <svg class="w-4 h-4 text-emerald-600 dark:text-[#10b981]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
             </svg>
           </div>
           <div>
             <div class="flex items-center space-x-2">
-              <span class="font-sans font-bold text-sm tracking-tight" style="color:#ffffff">YOLO26 Vision</span>
-              <span class="tag tag-green" style="border-radius:2px; font-size:0.6rem; padding:0.1rem 0.4rem">LIVE</span>
+              <span class="font-sans font-bold text-sm tracking-tight text-slate-900 dark:text-white">YOLO26 Vision</span>
+              <span class="tag tag-green rounded text-[0.6rem] py-0.5 px-1.5">LIVE</span>
             </div>
-            <div class="label" style="font-size:0.58rem; color:#8c8880">Object, Pose &amp; Face Detection</div>
+            <div class="label" style="font-size:0.58rem">Object, Pose &amp; Face Detection</div>
           </div>
         </div>
 
@@ -23,7 +23,7 @@
           <button
             type="button"
             (click)="setActiveTab('feed')"
-            [style.color]="activeTab() === 'feed' ? '#ffffff' : '#8c8880'"
+            [style.color]="activeTab() === 'feed' ? (themeService.isDark() ? '#ffffff' : '#0f172a') : (themeService.isDark() ? '#8c8880' : '#64748b')"
             [style.border-bottom]="activeTab() === 'feed' ? '2px solid #10b981' : '2px solid transparent'"
             class="px-3.5 py-2 text-xs font-mono tracking-wider uppercase transition-colors"
             style="background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.7rem">
@@ -32,18 +32,31 @@
           <button
             type="button"
             (click)="setActiveTab('logs')"
-            [style.color]="activeTab() === 'logs' ? '#ffffff' : '#8c8880'"
+            [style.color]="activeTab() === 'logs' ? (themeService.isDark() ? '#ffffff' : '#0f172a') : (themeService.isDark() ? '#8c8880' : '#64748b')"
             [style.border-bottom]="activeTab() === 'logs' ? '2px solid #10b981' : '2px solid transparent'"
             class="px-3.5 py-2 text-xs font-mono tracking-wider uppercase transition-colors"
             style="background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.7rem">
             Detection History
-            <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag" style="border-radius:2px; font-size:0.6rem">{{ logService.logs().length }}</span>
+            <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag rounded text-[0.6rem]">{{ logService.logs().length }}</span>
           </button>
         </nav>
       </div>
 
-      <div class="flex items-center space-x-3">
-        <div class="hidden md:flex items-center space-x-2 border hairline px-2.5 py-1" style="border-radius:3px; background:#111110">
+      <div class="flex items-center space-x-2.5">
+        <button
+          type="button"
+          (click)="themeService.toggleTheme()"
+          class="btn-ghost flex items-center justify-center p-2 rounded"
+          [title]="themeService.isDark() ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+          <svg *ngIf="themeService.isDark()" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <svg *ngIf="!themeService.isDark()" class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+        </button>
+
+        <div class="hidden md:flex items-center space-x-2 border hairline px-2.5 py-1 rounded bg-slate-100 dark:bg-[#111110]">
           <span class="status-dot" [style.background]="wsService.isConnected() ? '#10b981' : '#ef4444'"></span>
           <span class="font-mono text-xs" [style.color]="wsService.isConnected() ? '#10b981' : '#ef4444'" style="font-size:0.65rem">
             {{ wsService.isConnected() ? 'YOLO Connected' : 'Offline' }}
@@ -54,34 +67,32 @@
           <button
             type="button"
             (click)="toggleAccountMenu()"
-            class="flex items-center space-x-2.5 border hairline px-3 py-1.5 transition-colors cursor-pointer"
-            style="border-radius:3px; background:#111110"
-            [style.border-color]="isAccountMenuOpen() ? '#10b981' : 'rgba(210,205,195,0.1)'">
+            class="flex items-center space-x-2.5 border hairline px-3 py-1.5 transition-colors cursor-pointer rounded bg-slate-100 dark:bg-[#111110]"
+            [style.border-color]="isAccountMenuOpen() ? '#10b981' : ''">
             <img *ngIf="user.picture" [src]="user.picture" alt="User" class="w-5 h-5 rounded-full object-cover border hairline"/>
-            <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono" style="background:#171715; color:#10b981">
+            <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono bg-slate-200 dark:bg-[#171715] text-emerald-600 dark:text-[#10b981]">
               {{ user.name.slice(0, 1).toUpperCase() }}
             </div>
             <div class="hidden sm:flex flex-col text-left">
-              <span class="text-xs font-sans font-medium truncate max-w-[120px]" style="color:#d0cdc4">{{ user.name }}</span>
+              <span class="text-xs font-sans font-medium truncate max-w-[120px] text-slate-900 dark:text-[#d0cdc4]">{{ user.name }}</span>
             </div>
-            <svg class="w-3 h-3 transition-transform" [style.transform]="isAccountMenuOpen() ? 'rotate(180deg)' : 'rotate(0deg)'" viewBox="0 0 24 24" fill="none" stroke="#8c8880" stroke-width="1.75">
+            <svg class="w-3 h-3 transition-transform text-slate-500 dark:text-[#8c8880]" [style.transform]="isAccountMenuOpen() ? 'rotate(180deg)' : 'rotate(0deg)'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
 
           <div
             *ngIf="isAccountMenuOpen()"
-            class="absolute right-0 mt-2 w-64 border hairline shadow-2xl z-50 overflow-hidden"
-            style="border-radius:3px; background:#111110">
-            <div class="p-4 border-b hairline" style="background:#141412">
+            class="absolute right-0 mt-2 w-64 border hairline shadow-2xl z-50 overflow-hidden rounded bg-white dark:bg-[#111110]">
+            <div class="p-4 border-b hairline bg-slate-50 dark:bg-[#141412]">
               <div class="flex items-center space-x-3 mb-1">
                 <img *ngIf="user.picture" [src]="user.picture" alt="User" class="w-8 h-8 rounded-full object-cover border hairline"/>
-                <div *ngIf="!user.picture" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono" style="background:#1c1c19; color:#10b981">
+                <div *ngIf="!user.picture" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono bg-slate-200 dark:bg-[#1c1c19] text-emerald-600 dark:text-[#10b981]">
                   {{ user.name.slice(0, 1).toUpperCase() }}
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="font-sans font-medium text-xs truncate" style="color:#ffffff">{{ user.name }}</div>
-                  <div class="font-mono text-xs truncate" style="color:#8c8880; font-size:0.65rem">{{ user.email }}</div>
+                  <div class="font-sans font-medium text-xs truncate text-slate-900 dark:text-white">{{ user.name }}</div>
+                  <div class="font-mono text-xs truncate text-slate-500 dark:text-[#8c8880] text-[0.65rem]">{{ user.email }}</div>
                 </div>
               </div>
             </div>
@@ -90,8 +101,7 @@
               <button
                 type="button"
                 (click)="signOut()"
-                class="btn-danger w-full flex items-center justify-center space-x-2"
-                style="border-radius:3px; padding:0.45rem 1rem">
+                class="btn-danger w-full flex items-center justify-center space-x-2 rounded py-2 px-4">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
@@ -105,25 +115,24 @@
           *ngIf="!authService.currentUser()"
           type="button"
           (click)="openSignInModal()"
-          class="btn-primary flex items-center space-x-2"
-          style="border-radius:3px; font-size:0.75rem">
+          class="btn-primary flex items-center space-x-2 rounded text-xs">
           <span>SIGN IN</span>
         </button>
       </div>
 
     </div>
 
-    <div class="sm:hidden border-t hairline px-3 py-1.5 flex justify-around" style="background:#0e0e0c">
+    <div class="sm:hidden border-t hairline px-3 py-1.5 flex justify-around bg-slate-50 dark:bg-[#0e0e0c]">
       <button
         type="button"
         (click)="setActiveTab('feed')"
-        [style.color]="activeTab() === 'feed' ? '#10b981' : '#8c8880'"
+        [style.color]="activeTab() === 'feed' ? '#10b981' : (themeService.isDark() ? '#8c8880' : '#64748b')"
         class="py-1 text-xs font-mono uppercase tracking-wider transition-colors"
         style="background:transparent; border:none; cursor:pointer">Live Detection</button>
       <button
         type="button"
         (click)="setActiveTab('logs')"
-        [style.color]="activeTab() === 'logs' ? '#10b981' : '#8c8880'"
+        [style.color]="activeTab() === 'logs' ? '#10b981' : (themeService.isDark() ? '#8c8880' : '#64748b')"
         class="py-1 text-xs font-mono uppercase tracking-wider transition-colors"
         style="background:transparent; border:none; cursor:pointer">History ({{ logService.logs().length }})</button>
     </div>
@@ -157,28 +166,28 @@
 
   </main>
 
-  <footer class="border-t hairline px-4 sm:px-6 py-3.5 mt-auto" style="background:#0e0e0c">
+  <footer class="border-t hairline px-4 sm:px-6 py-3.5 mt-auto bg-white dark:bg-[#0e0e0c] transition-colors duration-200">
     <div class="max-w-screen-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
       <div class="flex items-center space-x-3">
         <span class="status-dot animate-live" style="background:#10b981"></span>
-        <span class="label" style="font-size:0.65rem">YOLO26 Vision &bull; Dual-Model Pipeline (yolo26m.pt + yolo26m-pose.pt)</span>
+        <span class="label text-[0.65rem]">YOLO26 Vision &bull; Dual-Model Pipeline (yolo26m.pt + yolo26m-pose.pt)</span>
       </div>
-      <div class="label" style="font-size:0.65rem; color:#8c8880">Real-Time Object &amp; Pose Detection</div>
+      <div class="label text-[0.65rem] text-slate-500 dark:text-[#8c8880]">Real-Time Object &amp; Pose Detection</div>
     </div>
   </footer>
 
-  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(11,11,9,0.92); backdrop-filter:blur(8px)">
-    <div class="border hairline max-w-sm w-full flex flex-col shadow-2xl" style="border-radius:4px; background:#111110">
+  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
+    <div class="border hairline max-w-sm w-full flex flex-col shadow-2xl rounded bg-white dark:bg-[#111110] text-slate-900 dark:text-white">
 
-      <div class="flex items-center justify-between px-5 py-4 border-b hairline" style="background:#141412">
+      <div class="flex items-center justify-between px-5 py-4 border-b hairline bg-slate-50 dark:bg-[#141412]">
         <div>
-          <div class="font-sans text-sm font-semibold text-white">Sign In</div>
-          <div class="label mt-0.5" style="font-size:0.65rem">Access your profile and detection logs</div>
+          <div class="font-sans text-sm font-semibold text-slate-900 dark:text-white">Sign In</div>
+          <div class="label mt-0.5 text-[0.65rem]">Access your profile and detection logs</div>
         </div>
-        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost" style="padding:0.2rem 0.5rem; border-radius:3px">&times;</button>
+        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost rounded p-1 text-sm">&times;</button>
       </div>
 
-      <div *ngIf="authService.authErrorMessage()" class="px-5 py-2.5 border-b hairline" style="background:rgba(239,68,68,0.1); color:#ef4444">
+      <div *ngIf="authService.authErrorMessage()" class="px-5 py-2.5 border-b hairline bg-red-500/10 text-red-600 dark:text-red-400">
         <span class="font-mono text-xs">{{ authService.authErrorMessage() }}</span>
       </div>
 
@@ -186,15 +195,14 @@
         <button
           type="button"
           (click)="loginViaGoogle()"
-          class="btn-ghost w-full flex items-center justify-center space-x-2 border hairline"
-          style="border-radius:3px; padding:0.65rem 1rem; background:#141412">
+          class="btn-ghost w-full flex items-center justify-center space-x-2 border hairline rounded py-2.5 px-4 bg-white dark:bg-[#141412] hover:bg-slate-50 dark:hover:bg-[#171715]">
           <svg class="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span style="color:#ffffff; font-size:0.75rem; font-weight:500">Sign in with Google</span>
+          <span class="text-slate-900 dark:text-white text-xs font-medium">Sign in with Google</span>
         </button>
       </div>
 
