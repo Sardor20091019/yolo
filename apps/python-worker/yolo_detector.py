@@ -283,22 +283,13 @@ class YoloShopliftingDetector:
                 raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}').lower()
                 track_id = int(boxes.id[i].item()) if getattr(boxes, 'id', None) is not None and boxes.id[i] is not None else (i + 1)
 
-                if raw_label in MAP_COCO_TO_RETAIL:
-                    label = MAP_COCO_TO_RETAIL[raw_label]
-                elif raw_label != 'person':
-                    label = raw_label
-                else:
-                    label = 'person'
-
                 item_info = {
                     'trackId': track_id,
-                    'label': label,
+                    'label': raw_label,
                     'confidence': round(conf, 2),
                     'bbox': [round(x, 1) for x in xyxy]
                 }
                 boxes_out.append(item_info)
-                if label != 'person':
-                    detected_items.append(item_info)
 
         for pr in pose_results:
             p_boxes = getattr(pr, 'boxes', None)
@@ -308,10 +299,10 @@ class YoloShopliftingDetector:
 
             for i in range(len(p_boxes)):
                 p_track_id = int(p_boxes.id[i].item()) if getattr(p_boxes, 'id', None) is not None and p_boxes.id[i] is not None else (i + 1)
-                pxyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
                 kp_data = p_keypoints.data[i].cpu().numpy()
 
                 formatted_kps = []
+                face_kps = []
                 for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
                     kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
                     formatted_kps.append({
@@ -320,6 +311,8 @@ class YoloShopliftingDetector:
                         'confidence': round(kc, 2),
                         'name': KEYPOINT_NAMES[k_idx]
                     })
+                    if k_idx in [0, 1, 2, 3, 4] and kc >= 0.35 and kx > 0 and ky > 0:
+                        face_kps.append((kx, ky))
 
                 poses_out.append({
                     'trackId': p_track_id,
@@ -327,34 +320,29 @@ class YoloShopliftingDetector:
                     'skeleton': SKELETON_PAIRS
                 })
 
-                sus_result = self.heuristics.evaluate_person(
-                    p_track_id,
-                    tuple(pxyxy),
-                    formatted_kps,
-                    detected_items,
-                    zones,
-                    calibration
-                )
-                suspicion_out.append(sus_result)
-
-        self.heuristics.cleanup_stale_tracks()
-
-        annotated_buffer = self.overlay_stream_frame(image, poses_out, boxes_out)
-        annotated_base64 = ''
-        if self.cv2 is not None:
-            try:
-                ret, buf = self.cv2.imencode('.jpg', annotated_buffer, [int(self.cv2.IMWRITE_JPEG_QUALITY), 70])
-                if ret:
-                    annotated_base64 = 'data:image/jpeg;base64,' + base64.b64encode(buf).decode('utf-8')
-            except Exception:
-                pass
+                if len(face_kps) >= 2:
+                    fxs = [p[0] for p in face_kps]
+                    fys = [p[1] for p in face_kps]
+                    f_minx = min(fxs)
+                    f_maxx = max(fxs)
+                    f_miny = min(fys)
+                    f_maxy = max(fys)
+                    fw = f_maxx - f_minx
+                    fh = f_maxy - f_miny
+                    pad = max(15, max(fw, fh) * 0.4)
+                    boxes_out.append({
+                        'trackId': p_track_id,
+                        'label': 'face',
+                        'confidence': 0.95,
+                        'bbox': [round(max(0, f_minx - pad), 1), round(max(0, f_miny - pad), 1), round(f_maxx + pad, 1), round(f_maxy + pad, 1)]
+                    })
 
         return {
             'frameIndex': frame_index,
             'timestamp': int(time.time() * 1000),
             'boxes': boxes_out,
             'poses': poses_out,
-            'suspicion': suspicion_out,
-            'alertTriggered': any(s['score'] >= float(calibration.get('suspicionThreshold', 75)) for s in suspicion_out),
-            'annotatedFrame': annotated_base64
+            'suspicion': [],
+            'alertTriggered': False,
+            'annotatedFrame': ''
         }

@@ -204,6 +204,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
           ...process.env,
           PYTHONUNBUFFERED: '1',
           PYTHONPATH: workerDir,
+          YOLO_CONFIG_DIR: '/tmp/ultralytics_config',
         },
       });
 

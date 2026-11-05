@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
 import * as path from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -12,7 +13,6 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   const port = configService.get<number>('port', 3000);
-  const corsOrigin = configService.get<string>('corsOrigin', 'http://localhost:4200');
   const rawUploadsDir = configService.get<string>('uploadsDir', './uploads');
   const uploadsDir = path.isAbsolute(rawUploadsDir)
     ? rawUploadsDir
@@ -21,7 +21,9 @@ async function bootstrap(): Promise<void> {
       : path.resolve(process.cwd(), rawUploadsDir);
 
   app.enableCors({
-    origin: corsOrigin.includes(',') ? corsOrigin.split(',') : corsOrigin,
+    origin: (_origin, callback) => {
+      callback(null, true);
+    },
     credentials: true,
   });
 
@@ -37,8 +39,33 @@ async function bootstrap(): Promise<void> {
 
   app.use('/uploads', express.static(path.resolve(uploadsDir)));
 
+  const clientCandidates = [
+    path.resolve(process.cwd(), 'apps/web/dist/web/browser'),
+    path.resolve(process.cwd(), '../web/dist/web/browser'),
+    path.resolve(__dirname, '../../web/dist/web/browser'),
+    path.resolve(__dirname, '../../../apps/web/dist/web/browser'),
+  ];
+  let clientBuildPath: string | null = null;
+  for (const c of clientCandidates) {
+    if (fs.existsSync(c)) {
+      clientBuildPath = c;
+      break;
+    }
+  }
+
+  if (clientBuildPath) {
+    app.use(express.static(clientBuildPath));
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/uploads')) {
+        res.sendFile(path.join(clientBuildPath!, 'index.html'));
+      } else {
+        next();
+      }
+    });
+  }
+
   await app.listen(port);
-  logger.log(`Shoplifting Detection API is running on port ${port}`);
+  logger.log(`YOLO Detection API is running on port ${port}`);
 }
 
 bootstrap();

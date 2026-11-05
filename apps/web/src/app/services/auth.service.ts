@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, WritableSignal, Signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap, catchError, of } from 'rxjs';
+import { Observable, tap, catchError, of, map } from 'rxjs';
 import { getApiBaseUrl } from './api-config';
 
 export interface UserSession {
@@ -167,6 +167,38 @@ export class AuthService {
 
   public loginViaGoogle(): void {
     this.redirectToGoogleOAuth();
+  }
+
+  public loginWithIdentifier(identifier: string): Observable<boolean> {
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      this.authErrorMessage.set('Please enter a username or email.');
+      return of(false);
+    }
+
+    this.isAuthenticating.set(true);
+    this.authErrorMessage.set('');
+
+    return this.http
+      .post<{ user: UserSession; accessToken: string; refreshToken: string }>(
+        `${this.apiBaseUrl}/auth/login`,
+        { identifier: cleanId },
+      )
+      .pipe(
+        tap((res) => {
+          this.isAuthenticating.set(false);
+          if (res && res.user && res.accessToken) {
+            this.setUserSession(res.user, res.accessToken, res.refreshToken);
+            this.isAuthModalOpen.set(false);
+          }
+        }),
+        map(() => true),
+        catchError((err) => {
+          this.isAuthenticating.set(false);
+          this.authErrorMessage.set(err?.error?.message || 'Login failed. Please check your credentials.');
+          return of(false);
+        }),
+      );
   }
 
   public verifyGoogleCredentialOnBackend(
