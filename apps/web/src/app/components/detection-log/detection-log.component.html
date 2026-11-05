@@ -1,6 +1,6 @@
 <div class="flex flex-col border hairline overflow-hidden" style="border-radius:4px; background:#0b0b09">
 
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 border-b hairline gap-3" style="background:#111110">
+  <div class="flex items-center justify-between px-5 py-3 border-b hairline" style="background:#111110">
     <div class="flex items-center space-x-3">
       <div class="status-dot" style="background:#10b981"></div>
       <div>
@@ -8,62 +8,6 @@
         <div class="label" style="font-size:0.6rem">Live detections logged in real time &bull; {{ logService.logs().length }} entries</div>
       </div>
     </div>
-
-    <div class="flex items-center space-x-2">
-      <div class="relative flex items-center">
-        <select
-          [value]="logService.currentUser().id"
-          (change)="handleUserChange($event)"
-          class="font-mono text-xs py-1 px-2.5 border hairline cursor-pointer"
-          style="border-radius:3px; background:#0b0b09; color:#d0cdc4; outline:none">
-          <option *ngFor="let u of logService.users()" [value]="u.id" style="background:#111110; color:#d0cdc4">
-            {{ u.name }}
-          </option>
-        </select>
-      </div>
-
-      <button
-        type="button"
-        (click)="toggleNewUserForm()"
-        class="btn-ghost"
-        style="border-radius:3px; font-size:0.65rem"
-        title="Add profile">
-        &#43; Profile
-      </button>
-
-      <button
-        *ngIf="logService.users().length > 1"
-        type="button"
-        (click)="deleteCurrentUser()"
-        class="btn-danger"
-        style="border-radius:3px; padding:0.2rem 0.5rem"
-        title="Delete profile">
-        &times;
-      </button>
-    </div>
-  </div>
-
-  <div *ngIf="isCreatingUser()" class="px-5 py-2.5 border-b hairline flex items-center gap-2" style="background:#171715">
-    <input
-      type="text"
-      [(ngModel)]="newUserName"
-      placeholder="New profile name..."
-      class="flex-1 font-mono text-xs py-1.5 px-3 border hairline"
-      style="border-radius:3px; background:#0b0b09; color:#d0cdc4; outline:none"/>
-    <button
-      type="button"
-      (click)="submitNewUser()"
-      class="btn-primary"
-      style="border-radius:3px; font-size:0.65rem">
-      CREATE
-    </button>
-    <button
-      type="button"
-      (click)="toggleNewUserForm()"
-      class="btn-ghost"
-      style="border-radius:3px; font-size:0.65rem">
-      CANCEL
-    </button>
   </div>
 
   <div class="grid grid-cols-3 divide-x border-b flex-shrink-0" style="border-color:rgba(210,205,195,0.08)">

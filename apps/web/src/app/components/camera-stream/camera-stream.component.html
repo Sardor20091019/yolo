@@ -15,7 +15,7 @@
             {{ isStreaming() ? 'LIVE STREAM' : 'CAMERA STANDBY' }}
           </div>
           <div class="label" style="font-size:0.6rem">
-            {{ isStreaming() ? 'YOLO26 Inference Active · ' + latencyMs() + 'ms' : 'Ready' }}
+            {{ isStreaming() ? 'YOLO26 Active · ' + latencyMs() + 'ms' : 'Ready' }}
           </div>
         </div>
       </div>
@@ -27,43 +27,12 @@
       </div>
     </div>
 
-    <div class="flex items-center space-x-2 flex-wrap">
-      <div class="flex items-center border hairline" style="border-radius:3px; background:#0b0b09; overflow:hidden">
-        <button
-          type="button"
-          (click)="setZoom(0.5)"
-          class="font-mono px-2 py-1 transition-colors"
-          [style.background]="zoomLevel() <= 0.6 ? '#10b981' : 'transparent'"
-          [style.color]="zoomLevel() <= 0.6 ? '#0b0b09' : '#8c8880'"
-          style="font-size:0.62rem; border:none; cursor:pointer">0.5x</button>
-        <button
-          type="button"
-          (click)="setZoom(1.0)"
-          class="font-mono px-2 py-1 transition-colors"
-          [style.background]="zoomLevel() > 0.6 && zoomLevel() < 1.5 ? '#10b981' : 'transparent'"
-          [style.color]="zoomLevel() > 0.6 && zoomLevel() < 1.5 ? '#0b0b09' : '#8c8880'"
-          style="font-size:0.62rem; border:none; cursor:pointer">1x</button>
-        <button
-          type="button"
-          (click)="setZoom(2.0)"
-          class="font-mono px-2 py-1 transition-colors"
-          [style.background]="zoomLevel() >= 1.5 && zoomLevel() < 2.5 ? '#10b981' : 'transparent'"
-          [style.color]="zoomLevel() >= 1.5 && zoomLevel() < 2.5 ? '#0b0b09' : '#8c8880'"
-          style="font-size:0.62rem; border:none; cursor:pointer">2x</button>
-        <button
-          type="button"
-          (click)="setZoom(3.0)"
-          class="font-mono px-2 py-1 transition-colors"
-          [style.background]="zoomLevel() >= 2.5 ? '#10b981' : 'transparent'"
-          [style.color]="zoomLevel() >= 2.5 ? '#0b0b09' : '#8c8880'"
-          style="font-size:0.62rem; border:none; cursor:pointer">3x</button>
-      </div>
-
+    <div class="flex items-center space-x-2">
       <button
         type="button"
         (click)="toggleCameraFacing()"
         class="btn-ghost flex items-center space-x-1"
-        style="border-radius:3px; padding:0.3rem 0.6rem; font-size:0.65rem">
+        style="border-radius:3px; padding:0.35rem 0.65rem; font-size:0.65rem">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
@@ -74,14 +43,14 @@
         type="button"
         (click)="toggleFullscreen()"
         class="btn-ghost flex items-center space-x-1"
-        style="border-radius:3px; padding:0.3rem 0.6rem; font-size:0.65rem">
+        style="border-radius:3px; padding:0.35rem 0.65rem; font-size:0.65rem">
         <svg *ngIf="!isFullscreen()" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
         </svg>
         <svg *ngIf="isFullscreen()" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 9L4 4m5 5H4m5 0V4m6 5l5-5m-5 5h5m-5 0V4m-6 11l-5 5m5-5H4m5 0v5m6-5l5 5m-5-5h5m-5 0v5"/>
         </svg>
-        <span>{{ isFullscreen() ? 'EXIT' : 'FULL' }}</span>
+        <span>{{ isFullscreen() ? 'EXIT' : 'FULLSCREEN' }}</span>
       </button>
 
       <button
@@ -91,16 +60,14 @@
         [style.background]="isStreaming() ? 'rgba(239,68,68,0.15)' : '#10b981'"
         [style.color]="isStreaming() ? '#ef4444' : '#0b0b09'"
         [style.border]="isStreaming() ? '1px solid rgba(239,68,68,0.4)' : '1px solid #10b981'"
-        style="padding:0.4rem 0.9rem; font-size:0.65rem; border-radius:3px; cursor:pointer">
+        style="padding:0.4rem 0.95rem; font-size:0.65rem; border-radius:3px; cursor:pointer">
         {{ isStreaming() ? 'STOP CAMERA' : 'START CAMERA' }}
       </button>
     </div>
   </div>
 
   <div class="relative flex-1 flex items-center justify-center overflow-hidden" style="background:#050607; min-height:360px">
-    <div
-      class="w-full h-full flex items-center justify-center transition-transform duration-200 origin-center"
-      [style.transform]="'scale(' + zoomLevel() + ')'">
+    <div class="w-full h-full flex items-center justify-center">
       <video
         #videoElement
         autoplay
@@ -115,8 +82,7 @@
       #hudCanvas
       width="1280"
       height="720"
-      class="absolute inset-0 w-full h-full object-contain pointer-events-none transition-transform duration-200 origin-center z-10"
-      [style.transform]="'scale(' + zoomLevel() + ')'">
+      class="absolute inset-0 w-full h-full object-contain pointer-events-none z-10">
     </canvas>
 
     <canvas #hiddenCanvas class="hidden"></canvas>

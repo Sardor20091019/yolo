@@ -16,12 +16,6 @@ import { DetectionApiService } from '../../services/detection.service';
 import { DetectionLogService } from '../../services/detection-log.service';
 import { BoundingBox, PoseSkeleton } from '../../models/detection.model';
 
-interface CameraLensDevice {
-  deviceId: string;
-  label: string;
-  type: 'ultra-wide' | 'wide' | 'telephoto' | 'standard';
-}
-
 @Component({
   selector: 'app-camera-stream',
   standalone: true,
@@ -39,16 +33,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public readonly fps: WritableSignal<number> = signal<number>(0);
   public readonly facingMode: WritableSignal<'environment' | 'user'> = signal<'environment' | 'user'>('user');
   public readonly currentDetectionsCount: WritableSignal<number> = signal<number>(0);
-  public readonly zoomLevel: WritableSignal<number> = signal<number>(1.0);
-  public readonly activeLensLabel: WritableSignal<string> = signal<string>('1.0x MAIN');
-  public readonly hardwareZoomSupported: WritableSignal<boolean> = signal<boolean>(false);
   public readonly detectedObjectChips: WritableSignal<{ label: string; confidence: number }[]> = signal([]);
   public readonly latencyMs: WritableSignal<number> = signal<number>(16);
 
   public currentDetections: BoundingBox[] = [];
   public currentPoses: PoseSkeleton[] = [];
-  public availableLenses: CameraLensDevice[] = [];
-  public activeDeviceId: string = '';
 
   private mediaStream: MediaStream | null = null;
   private captureIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -58,6 +47,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private renderAnimationId: number | null = null;
   private lastBackendTimestamp: number = 0;
   private lastSendTimestamp: number = 0;
+  private isProcessingFrame: boolean = false;
+  private sentFrameWidth: number = 640;
+  private sentFrameHeight: number = 360;
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -67,34 +59,38 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     effect(() => {
       const result = this.wsService.latestResult();
       if (result) {
+        this.isProcessingFrame = false;
         this.lastBackendTimestamp = Date.now();
         if (this.lastSendTimestamp > 0) {
-          const roundTrip = Math.max(12, Math.min(180, this.lastBackendTimestamp - this.lastSendTimestamp));
+          const roundTrip = Math.max(12, Math.min(250, this.lastBackendTimestamp - this.lastSendTimestamp));
           this.latencyMs.set(roundTrip);
         }
 
         const boxes = result.boxes || [];
         const poses = result.poses || [];
 
-        this.currentDetections = boxes;
-        this.currentPoses = poses;
-        this.currentDetectionsCount.set(boxes.length);
+        if (boxes.length > 0 || poses.length > 0) {
+          this.currentDetections = boxes;
+          this.currentPoses = poses;
+          this.currentDetectionsCount.set(boxes.length);
 
-        const chips = boxes.map((d) => ({
-          label: d.label,
-          confidence: Math.round(d.confidence * 100),
-        }));
-        this.detectedObjectChips.set(chips);
-
-        if (boxes.length > 0) {
+          const chips = boxes.map((d) => ({
+            label: d.label,
+            confidence: Math.round(d.confidence * 100),
+          }));
+          this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
+        } else if (Date.now() - this.lastBackendTimestamp > 1200) {
+          this.currentDetections = [];
+          this.currentPoses = [];
+          this.currentDetectionsCount.set(0);
+          this.detectedObjectChips.set([]);
         }
       }
     });
   }
 
   public ngOnInit(): void {
-    this.enumerateCameraLenses();
     this.startRenderLoop();
   }
 
@@ -117,41 +113,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.isFullscreen.set(isDocFullscreen);
   }
 
-  public async enumerateCameraLenses(): Promise<void> {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-      return;
-    }
-
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
-      const lenses: CameraLensDevice[] = [];
-
-      videoInputs.forEach((device, index) => {
-        const label = device.label.toLowerCase();
-        let type: 'ultra-wide' | 'wide' | 'telephoto' | 'standard' = 'standard';
-
-        if (label.includes('ultra') || label.includes('0.5') || label.includes('wide-angle')) {
-          type = 'ultra-wide';
-        } else if (label.includes('tele') || label.includes('2x') || label.includes('3x') || label.includes('zoom')) {
-          type = 'telephoto';
-        } else if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
-          type = 'wide';
-        }
-
-        lenses.push({
-          deviceId: device.deviceId,
-          label: device.label || `Camera ${index + 1}`,
-          type,
-        });
-      });
-
-      this.availableLenses = lenses;
-    } catch {
-      this.availableLenses = [];
-    }
-  }
-
   public async toggleStreaming(): Promise<void> {
     if (this.isStreaming()) {
       this.stopStream();
@@ -163,7 +124,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public async startStream(): Promise<void> {
     try {
       let stream: MediaStream;
-      const constraints = this.buildCameraConstraints();
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: this.facingMode() },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      };
 
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -172,8 +140,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: this.facingMode() },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
             },
             audio: false,
           });
@@ -191,10 +157,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         this.videoRef.nativeElement.srcObject = this.mediaStream;
         await this.videoRef.nativeElement.play();
       }
-
-      await this.enumerateCameraLenses();
-      this.detectTrackCapabilities();
-      await this.applyHardwareZoom(this.zoomLevel());
 
       this.isStreaming.set(true);
       this.startCaptureInterval();
@@ -220,55 +182,12 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.currentDetectionsCount.set(0);
     this.detectedObjectChips.set([]);
     this.isStreaming.set(false);
-  }
-
-  private buildCameraConstraints(): MediaStreamConstraints {
-    if (this.activeDeviceId) {
-      return {
-        video: {
-          deviceId: { exact: this.activeDeviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      };
-    }
-
-    return {
-      video: {
-        facingMode: { ideal: this.facingMode() },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-      audio: false,
-    };
-  }
-
-  private detectTrackCapabilities(): void {
-    if (!this.mediaStream) {
-      return;
-    }
-    const track = this.mediaStream.getVideoTracks()[0];
-    if (!track) {
-      return;
-    }
-
-    const caps = track.getCapabilities ? (track.getCapabilities() as unknown as { zoom?: { min: number; max: number } }) : null;
-    const settings = track.getSettings ? (track.getSettings() as MediaTrackSettings) : null;
-
-    if (settings && settings.deviceId) {
-      this.activeDeviceId = settings.deviceId;
-    }
-
-    this.hardwareZoomSupported.set(!!(caps && 'zoom' in caps));
+    this.isProcessingFrame = false;
   }
 
   public async toggleCameraFacing(): Promise<void> {
     const nextFacing = this.facingMode() === 'environment' ? 'user' : 'environment';
     this.facingMode.set(nextFacing);
-    this.activeDeviceId = '';
-    this.zoomLevel.set(1.0);
-    this.updateLensLabel(1.0);
 
     if (this.isStreaming()) {
       if (this.mediaStream) {
@@ -276,93 +195,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         this.mediaStream = null;
       }
       await this.startStream();
-    }
-  }
-
-  public async setZoom(target: number): Promise<void> {
-    const clamped = Math.max(0.5, Math.min(5.0, Math.round(target * 10) / 10));
-    this.zoomLevel.set(clamped);
-    this.updateLensLabel(clamped);
-
-    if (this.facingMode() === 'environment' && this.availableLenses.length > 1) {
-      if (clamped <= 0.6) {
-        const ultraLens = this.availableLenses.find((l) => l.type === 'ultra-wide');
-        if (ultraLens && ultraLens.deviceId !== this.activeDeviceId) {
-          await this.switchPhysicalLensDevice(ultraLens.deviceId);
-          return;
-        }
-      } else if (clamped >= 2.5) {
-        const teleLens = this.availableLenses.find((l) => l.type === 'telephoto');
-        if (teleLens && teleLens.deviceId !== this.activeDeviceId) {
-          await this.switchPhysicalLensDevice(teleLens.deviceId);
-          return;
-        }
-      } else {
-        const wideLens = this.availableLenses.find((l) => l.type === 'wide');
-        if (wideLens && wideLens.deviceId !== this.activeDeviceId && this.activeDeviceId !== '') {
-          await this.switchPhysicalLensDevice(wideLens.deviceId);
-          return;
-        }
-      }
-    }
-
-    await this.applyHardwareZoom(clamped);
-  }
-
-  public async zoomIn(): Promise<void> {
-    const current = this.zoomLevel();
-    const next = current >= 2.0 ? current + 1.0 : (current >= 1.0 ? current + 0.5 : 1.0);
-    await this.setZoom(next);
-  }
-
-  public async zoomOut(): Promise<void> {
-    const current = this.zoomLevel();
-    const next = current > 2.0 ? current - 1.0 : (current > 1.0 ? 1.0 : 0.5);
-    await this.setZoom(next);
-  }
-
-  private updateLensLabel(level: number): void {
-    if (level <= 0.6) {
-      this.activeLensLabel.set('0.5x ULTRA-WIDE');
-    } else if (level === 1.0) {
-      this.activeLensLabel.set('1.0x MAIN');
-    } else if (level >= 2.5) {
-      this.activeLensLabel.set(`${level.toFixed(1)}x TELEPHOTO`);
-    } else {
-      this.activeLensLabel.set(`${level.toFixed(1)}x ZOOM`);
-    }
-  }
-
-  private async switchPhysicalLensDevice(deviceId: string): Promise<void> {
-    this.activeDeviceId = deviceId;
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
-    await this.startStream();
-  }
-
-  private async applyHardwareZoom(level: number): Promise<void> {
-    if (!this.mediaStream) {
-      return;
-    }
-    const track = this.mediaStream.getVideoTracks()[0];
-    if (!track) {
-      return;
-    }
-
-    const caps = track.getCapabilities ? (track.getCapabilities() as unknown as { zoom?: { min: number; max: number } }) : null;
-    if (caps && caps.zoom) {
-      try {
-        const minZ = caps.zoom.min || 1.0;
-        const maxZ = caps.zoom.max || 5.0;
-        const hardwareTarget = Math.max(minZ, Math.min(maxZ, level));
-        await track.applyConstraints({
-          advanced: [{ zoom: hardwareTarget } as unknown as MediaTrackConstraintSet],
-        });
-      } catch {
-        return;
-      }
     }
   }
 
@@ -400,7 +232,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       clearInterval(this.captureIntervalId);
     }
 
-    const intervalMs = Math.round(1000 / 12);
+    const intervalMs = 120;
     this.captureIntervalId = setInterval(() => {
       this.captureAndProcessFrame();
     }, intervalMs);
@@ -408,6 +240,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
   private captureAndProcessFrame(): void {
     if (!this.isStreaming()) {
+      return;
+    }
+
+    const now = Date.now();
+    if (this.isProcessingFrame && now - this.lastSendTimestamp < 1500) {
       return;
     }
 
@@ -424,27 +261,37 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
     const vWidth = video.videoWidth || 640;
     const vHeight = video.videoHeight || 360;
-    hiddenCanvas.width = vWidth;
-    hiddenCanvas.height = vHeight;
 
-    const hudCanvas = this.hudCanvasRef?.nativeElement;
-    if (hudCanvas && (hudCanvas.width !== vWidth || hudCanvas.height !== vHeight)) {
-      hudCanvas.width = vWidth;
-      hudCanvas.height = vHeight;
+    const maxDim = 640;
+    let targetW = vWidth;
+    let targetH = vHeight;
+    if (vWidth > maxDim || vHeight > maxDim) {
+      if (vWidth >= vHeight) {
+        targetW = maxDim;
+        targetH = Math.round((vHeight / vWidth) * maxDim);
+      } else {
+        targetH = maxDim;
+        targetW = Math.round((vWidth / vHeight) * maxDim);
+      }
     }
 
-    ctx.drawImage(video, 0, 0, vWidth, vHeight);
-    const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
+    hiddenCanvas.width = targetW;
+    hiddenCanvas.height = targetH;
+    this.sentFrameWidth = targetW;
+    this.sentFrameHeight = targetH;
+
+    ctx.drawImage(video, 0, 0, targetW, targetH);
+    const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.6);
 
     this.frameCounter++;
     this.framesSinceLastFps++;
-    const now = Date.now();
     if (now - this.lastFpsTimestamp >= 1000) {
       this.fps.set(this.framesSinceLastFps);
       this.framesSinceLastFps = 0;
       this.lastFpsTimestamp = now;
     }
 
+    this.isProcessingFrame = true;
     this.lastSendTimestamp = now;
     this.wsService.sendFrame(
       frameBase64,
@@ -477,12 +324,15 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const now = Date.now();
-            const isFresh = now - this.lastBackendTimestamp < 2500;
+            const isFresh = now - this.lastBackendTimestamp < 1800;
             const posesToRender = isFresh ? this.currentPoses : [];
             const boxesToRender = isFresh ? this.currentDetections : [];
 
-            this.renderPoses(ctx, posesToRender);
-            this.renderBoxes(ctx, boxesToRender);
+            const scaleX = canvas.width / (this.sentFrameWidth || canvas.width);
+            const scaleY = canvas.height / (this.sentFrameHeight || canvas.height);
+
+            this.renderPoses(ctx, posesToRender, scaleX, scaleY);
+            this.renderBoxes(ctx, boxesToRender, scaleX, scaleY);
           }
         }
       }
@@ -491,7 +341,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.renderAnimationId = requestAnimationFrame(loop);
   }
 
-  private renderPoses(ctx: CanvasRenderingContext2D, poses: PoseSkeleton[]): void {
+  private renderPoses(ctx: CanvasRenderingContext2D, poses: PoseSkeleton[], scaleX: number, scaleY: number): void {
     if (!poses || poses.length === 0) {
       return;
     }
@@ -502,7 +352,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         return;
       }
 
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.strokeStyle = '#06b6d4';
 
       if (pose.skeleton && pose.skeleton.length > 0) {
@@ -510,10 +360,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           if (i1 < kps.length && i2 < kps.length) {
             const kp1 = kps[i1];
             const kp2 = kps[i2];
-            if (kp1 && kp2 && kp1.confidence >= 0.35 && kp2.confidence >= 0.35 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
+            if (kp1 && kp2 && kp1.confidence >= 0.3 && kp2.confidence >= 0.3 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
               ctx.beginPath();
-              ctx.moveTo(kp1.x, kp1.y);
-              ctx.lineTo(kp2.x, kp2.y);
+              ctx.moveTo(kp1.x * scaleX, kp1.y * scaleY);
+              ctx.lineTo(kp2.x * scaleX, kp2.y * scaleY);
               ctx.stroke();
             }
           }
@@ -521,15 +371,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       kps.forEach((kp) => {
-        if (kp.confidence >= 0.35 && kp.x > 0 && kp.y > 0) {
+        if (kp.confidence >= 0.3 && kp.x > 0 && kp.y > 0) {
+          const sx = kp.x * scaleX;
+          const sy = kp.y * scaleY;
+
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 4, 0, Math.PI * 2);
+          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 4, 0, Math.PI * 2);
-          ctx.lineWidth = 1.5;
+          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
           ctx.strokeStyle = '#06b6d4';
           ctx.stroke();
         }
@@ -537,15 +390,19 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     });
   }
 
-  private renderBoxes(ctx: CanvasRenderingContext2D, boxes: BoundingBox[]): void {
+  private renderBoxes(ctx: CanvasRenderingContext2D, boxes: BoundingBox[], scaleX: number, scaleY: number): void {
     if (!boxes || boxes.length === 0) {
       return;
     }
 
     boxes.forEach((box) => {
-      const [x1, y1, x2, y2] = box.bbox;
-      const w = Math.max(2, x2 - x1);
-      const h = Math.max(2, y2 - y1);
+      const rawBbox = box.bbox;
+      const x1 = rawBbox[0] * scaleX;
+      const y1 = rawBbox[1] * scaleY;
+      const x2 = rawBbox[2] * scaleX;
+      const y2 = rawBbox[3] * scaleY;
+      const w = Math.max(4, x2 - x1);
+      const h = Math.max(4, y2 - y1);
       const labelLower = (box.label || '').toLowerCase();
 
       let strokeColor = '#10b981';
@@ -563,7 +420,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(x1, y1, w, h);
 
       ctx.fillStyle = fillColor;
@@ -572,10 +429,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const confPct = Math.round((box.confidence || 0.85) * 100);
       const labelText = `ID #${box.trackId} · ${box.label.toUpperCase()} · ${confPct}%`;
 
-      ctx.font = '600 11px "IBM Plex Mono", monospace';
+      ctx.font = '600 12px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
-      const badgeH = 20;
-      const badgeW = Math.max(textMetrics.width + 14, 80);
+      const badgeH = 22;
+      const badgeW = Math.max(textMetrics.width + 16, 80);
       const badgeY = Math.max(0, y1 - badgeH);
 
       ctx.fillStyle = '#111110';
@@ -586,7 +443,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.strokeRect(x1, badgeY, badgeW, badgeH);
 
       ctx.fillStyle = '#f0ede6';
-      ctx.fillText(labelText, x1 + 6, badgeY + 14);
+      ctx.fillText(labelText, x1 + 8, badgeY + 15);
     });
   }
 }

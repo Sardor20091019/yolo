@@ -81,6 +81,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   private lastAlertTimestamps: Map<number, number> = new Map();
   private zoneDwellTrackers: Map<number, { entryTime: number; zoneName: string }> = new Map();
   private cctvStations: Map<string, CctvStationInfo> = new Map();
+  private cachedZones: Array<{ id: string; name: string; polygon: [number, number][]; dwellLimit: number }> = [];
+  private lastZonesFetchTimestamp: number = 0;
 
   public getAllCctvStations(): CctvStationInfo[] {
     const now = Date.now();
@@ -276,13 +278,22 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     stationName?: string,
     userId?: string,
   ): Promise<FrameProcessingResult> {
-    const activeZones = await this.detectionRepository.findActiveZones();
-    const zones = activeZones.map((z) => ({
-      id: z.id,
-      name: z.name,
-      polygon: JSON.parse(z.polygon_coordinates || '[]') as [number, number][],
-      dwellLimit: z.dwell_time_threshold,
-    }));
+    const now = Date.now();
+    if (now - this.lastZonesFetchTimestamp > 30000 || this.cachedZones.length === 0) {
+      try {
+        const activeZones = await this.detectionRepository.findActiveZones();
+        this.cachedZones = activeZones.map((z) => ({
+          id: z.id,
+          name: z.name,
+          polygon: JSON.parse(z.polygon_coordinates || '[]') as [number, number][],
+          dwellLimit: z.dwell_time_threshold,
+        }));
+        this.lastZonesFetchTimestamp = now;
+      } catch {
+        this.cachedZones = [];
+      }
+    }
+    const zones = this.cachedZones;
 
     const requestId = ++this.requestCounter;
     const payload = {
@@ -322,8 +333,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
             frameData,
             workerResult.boxes.map((b) => b.label),
           );
-          await this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData);
-          await this.persistAnalyzedDetections(workerResult, stationId, stationName, userId);
+          void this.evaluateSuspicionAndTriggerAlerts(workerResult, frameData).catch(() => {});
+          void this.persistAnalyzedDetections(workerResult, stationId, stationName, userId).catch(() => {});
           return workerResult;
         }
       } catch (err: unknown) {
@@ -355,8 +366,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         frameData,
         result.boxes.map((b) => b.label),
       );
-      await this.evaluateSuspicionAndTriggerAlerts(result, frameData);
-      await this.persistAnalyzedDetections(result, stationId, stationName, userId);
+      void this.evaluateSuspicionAndTriggerAlerts(result, frameData).catch(() => {});
+      void this.persistAnalyzedDetections(result, stationId, stationName, userId).catch(() => {});
       return result;
     }
 

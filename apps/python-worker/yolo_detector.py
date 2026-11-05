@@ -90,13 +90,14 @@ class YoloShopliftingDetector:
             repo_dir = os.path.dirname(os.path.dirname(base_dir))
 
             def resolve_model_file(name: str) -> str:
+                if not name:
+                    return ''
                 paths_to_check = [
                     name,
                     os.path.join(base_dir, name),
                     os.path.join(repo_dir, name),
                     os.path.join(os.getcwd(), name),
-                    os.path.join(base_dir, 'yolo26m.pt'),
-                    os.path.join(base_dir, 'yolo26m-pose.pt')
+                    os.path.join(repo_dir, 'apps/python-worker', name)
                 ]
                 for p in paths_to_check:
                     if os.path.isfile(p):
@@ -107,8 +108,10 @@ class YoloShopliftingDetector:
                 resolve_model_file(det_path),
                 resolve_model_file(det_fallback),
                 resolve_model_file('yolo26m.pt'),
+                resolve_model_file('yolo11m.pt'),
                 resolve_model_file('yolo11n.pt'),
-                'yolo26m.pt'
+                'yolo11m.pt',
+                'yolo11n.pt'
             ]
             for candidate in det_candidates:
                 try:
@@ -121,8 +124,10 @@ class YoloShopliftingDetector:
                 resolve_model_file(pose_path),
                 resolve_model_file(pose_fallback),
                 resolve_model_file('yolo26m-pose.pt'),
+                resolve_model_file('yolo11m-pose.pt'),
                 resolve_model_file('yolo11n-pose.pt'),
-                'yolo26m-pose.pt'
+                'yolo11m-pose.pt',
+                'yolo11n-pose.pt'
             ]
             for candidate in pose_candidates:
                 try:
@@ -133,6 +138,7 @@ class YoloShopliftingDetector:
 
             if self.detection_model is not None and self.pose_model is not None:
                 self.has_ultralytics = True
+                self.executor = ThreadPoolExecutor(max_workers=2)
         except ImportError:
             self.has_ultralytics = False
 
