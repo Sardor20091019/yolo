@@ -21,8 +21,6 @@ import { AuthService } from './services/auth.service';
 export class AppComponent {
   public readonly activeTab: WritableSignal<'feed' | 'logs'> = signal<'feed' | 'logs'>('feed');
   public readonly isAccountMenuOpen: WritableSignal<boolean> = signal<boolean>(false);
-  public loginIdentifier: string = '';
-  public isSubmittingLogin: boolean = false;
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -52,24 +50,6 @@ export class AppComponent {
   }
 
   public openSignInModal(): void {
-    this.loginIdentifier = '';
     this.authService.openAuthModal();
-  }
-
-  public submitDirectLogin(): void {
-    if (!this.loginIdentifier.trim() || this.isSubmittingLogin) {
-      return;
-    }
-
-    this.isSubmittingLogin = true;
-    this.authService.loginWithIdentifier(this.loginIdentifier).subscribe({
-      next: () => {
-        this.isSubmittingLogin = false;
-        this.loginIdentifier = '';
-      },
-      error: () => {
-        this.isSubmittingLogin = false;
-      },
-    });
   }
 }
