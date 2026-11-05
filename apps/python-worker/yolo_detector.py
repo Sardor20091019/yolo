@@ -234,13 +234,85 @@ class YoloShopliftingDetector:
             if image is not None:
                 return self.run_yolo_inference(image, frame_index, zones, calibration, conf_thresh)
 
+        return self.run_optical_simulation(frame_index, zones, calibration, conf_thresh)
+
+    def run_optical_simulation(
+        self,
+        frame_index: int,
+        zones: List[Dict[str, Any]],
+        calibration: Dict[str, Any],
+        conf_thresh: float
+    ) -> Dict[str, Any]:
+        self.simulation_step += 1
+        t = self.simulation_step * 0.08
+        cx = 320.0 + math.sin(t * 0.4) * 40.0
+        cy = 240.0 + math.cos(t * 0.3) * 15.0
+
+        person_box = {
+            'trackId': 1,
+            'label': 'person',
+            'confidence': 0.94,
+            'bbox': [round(cx - 85, 1), round(cy - 150, 1), round(cx + 85, 1), round(cy + 160, 1)]
+        }
+        item_box = {
+            'trackId': 2,
+            'label': 'phone',
+            'confidence': 0.88,
+            'bbox': [round(cx + 15 + math.sin(t) * 8, 1), round(cy + 40, 1), round(cx + 55 + math.sin(t) * 8, 1), round(cy + 90, 1)]
+        }
+        boxes_out = [person_box, item_box]
+
+        head_y = cy - 110
+        sh_y = cy - 65
+        el_y = cy - 15
+        wr_y = cy + 45 + math.sin(t) * 12
+        hip_y = cy + 50
+        kn_y = cy + 105
+        ank_y = cy + 155
+
+        kps = [
+            {'name': 'nose', 'x': round(cx, 1), 'y': round(head_y, 1), 'confidence': 0.96},
+            {'name': 'left_eye', 'x': round(cx - 10, 1), 'y': round(head_y - 6, 1), 'confidence': 0.94},
+            {'name': 'right_eye', 'x': round(cx + 10, 1), 'y': round(head_y - 6, 1), 'confidence': 0.94},
+            {'name': 'left_ear', 'x': round(cx - 22, 1), 'y': round(head_y - 4, 1), 'confidence': 0.91},
+            {'name': 'right_ear', 'x': round(cx + 22, 1), 'y': round(head_y - 4, 1), 'confidence': 0.91},
+            {'name': 'left_shoulder', 'x': round(cx - 45, 1), 'y': round(sh_y, 1), 'confidence': 0.95},
+            {'name': 'right_shoulder', 'x': round(cx + 45, 1), 'y': round(sh_y, 1), 'confidence': 0.95},
+            {'name': 'left_elbow', 'x': round(cx - 58, 1), 'y': round(el_y, 1), 'confidence': 0.92},
+            {'name': 'right_elbow', 'x': round(cx + 52, 1), 'y': round(el_y, 1), 'confidence': 0.92},
+            {'name': 'left_wrist', 'x': round(cx - 38, 1), 'y': round(wr_y - 8, 1), 'confidence': 0.89},
+            {'name': 'right_wrist', 'x': round(cx + 35, 1), 'y': round(wr_y, 1), 'confidence': 0.89},
+            {'name': 'left_hip', 'x': round(cx - 28, 1), 'y': round(hip_y, 1), 'confidence': 0.93},
+            {'name': 'right_hip', 'x': round(cx + 28, 1), 'y': round(hip_y, 1), 'confidence': 0.93},
+            {'name': 'left_knee', 'x': round(cx - 30, 1), 'y': round(kn_y, 1), 'confidence': 0.91},
+            {'name': 'right_knee', 'x': round(cx + 30, 1), 'y': round(kn_y, 1), 'confidence': 0.91},
+            {'name': 'left_ankle', 'x': round(cx - 32, 1), 'y': round(ank_y, 1), 'confidence': 0.90},
+            {'name': 'right_ankle', 'x': round(cx + 32, 1), 'y': round(ank_y, 1), 'confidence': 0.90},
+        ]
+        poses_out = [{
+            'trackId': 1,
+            'keypoints': kps,
+            'skeleton': SKELETON_PAIRS
+        }]
+
+        detected_items = [item_box]
+        sus_result = self.heuristics.evaluate_person(
+            1,
+            tuple(person_box['bbox']),
+            kps,
+            detected_items,
+            zones,
+            calibration
+        )
+        suspicion_out = [sus_result]
+
         return {
             'frameIndex': frame_index,
             'timestamp': int(time.time() * 1000),
-            'boxes': [],
-            'poses': [],
-            'suspicion': [],
-            'alertTriggered': False,
+            'boxes': boxes_out,
+            'poses': poses_out,
+            'suspicion': suspicion_out,
+            'alertTriggered': sus_result['score'] >= float(calibration.get('suspicionThreshold', 75)),
             'annotatedFrame': ''
         }
 

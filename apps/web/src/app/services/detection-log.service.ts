@@ -77,6 +77,7 @@ export class DetectionLogService {
   });
 
   private lastRecordedTimeByLabel: Map<string, number> = new Map<string, number>();
+  private lastDbPostTimestamp: number = 0;
 
   constructor(private readonly http: HttpClient) {
     this.apiBaseUrl = getApiBaseUrl();
@@ -214,22 +215,25 @@ export class DetectionLogService {
     let currentLogs = [...this.logs()];
     let hasModifications = false;
 
-    const dbPayload = boxes.map((b) => ({
-      user_id: user.id,
-      station_id: 'CCTV-NODE-01',
-      station_name: user.name,
-      frame_index: 0,
-      track_id: b.trackId || 0,
-      label: b.label,
-      confidence: b.confidence || 0.9,
-      bbox: JSON.stringify(b.bbox || []),
-      suspicion_score: 0,
-      triggers: '[]',
-    }));
+    if (now - this.lastDbPostTimestamp >= 2500) {
+      this.lastDbPostTimestamp = now;
+      const dbPayload = boxes.map((b) => ({
+        user_id: user.id,
+        station_id: 'CCTV-NODE-01',
+        station_name: user.name,
+        frame_index: 0,
+        track_id: b.trackId || 0,
+        label: b.label,
+        confidence: b.confidence || 0.9,
+        bbox: JSON.stringify(b.bbox || []),
+        suspicion_score: 0,
+        triggers: '[]',
+      }));
 
-    this.http.post(`${this.apiBaseUrl}/detection/logs`, dbPayload).subscribe({
-      error: () => {},
-    });
+      this.http.post(`${this.apiBaseUrl}/detection/logs`, dbPayload).subscribe({
+        error: () => {},
+      });
+    }
 
     boxes.forEach((box) => {
       const label = box.label.toLowerCase().trim();

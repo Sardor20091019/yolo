@@ -7,8 +7,9 @@ __pycache__/
 *.pyc
 uploads/
 snapshots/
-*.pt
 .angular/
 .cache/
 .DS_Store
+*.pt
+runs/
 

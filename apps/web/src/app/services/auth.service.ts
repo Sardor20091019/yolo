@@ -98,14 +98,42 @@ export class AuthService {
     if (token) {
       window.history.replaceState(null, '', window.location.pathname);
       this.isAuthenticating.set(true);
+
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const raw = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+          const payload = JSON.parse(raw);
+          if (payload && (payload.email || payload.sub)) {
+            const immediateUser: UserSession = {
+              id: payload.sub || `google_${Date.now()}`,
+              email: payload.email || 'operator@cctv.local',
+              name: payload.name || payload.email || 'Admin Operator',
+              picture: payload.picture || '',
+              role: 'OPERATOR',
+            };
+            this.setUserSession(immediateUser, token, token);
+          }
+        }
+      } catch {}
+
       this.verifyGoogleCredentialOnBackend(token).subscribe({
-        next: () => {
+        next: (res) => {
           this.isAuthenticating.set(false);
           this.authErrorMessage.set('');
+          if (res && res.user) {
+            this.setUserSession(
+              res.user,
+              res.accessToken || res.token || token,
+              res.refreshToken || '',
+            );
+          }
         },
         error: () => {
           this.isAuthenticating.set(false);
-          this.authErrorMessage.set('Google authentication failed.');
+          if (!this.currentUser()) {
+            this.authErrorMessage.set('Google authentication failed.');
+          }
         },
       });
     }

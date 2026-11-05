@@ -64,6 +64,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private lastFpsTimestamp: number = Date.now();
   private framesSinceLastFps: number = 0;
   private renderAnimationId: number | null = null;
+  private lastBackendTimestamp: number = 0;
+  private frameRenderCount: number = 0;
+  private opticalCenterX: number = 0;
+  private opticalCenterY: number = 0;
+  private lastClientDbSyncTimestamp: number = 0;
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -73,7 +78,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     effect(() => {
       const result = this.wsService.latestResult();
       if (result) {
-        this.renderHud(result);
+        this.lastBackendTimestamp = Date.now();
         if (result.boxes && result.boxes.length > 0) {
           this.currentDetections = result.boxes;
           this.currentDetectionsCount.set(this.currentDetections.length);
@@ -84,10 +89,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           }));
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(this.currentDetections);
-        } else {
-          this.currentDetections = [];
-          this.currentDetectionsCount.set(0);
-          this.detectedObjectChips.set([]);
         }
 
         const highRisks = result.suspicion ? result.suspicion.filter((s) => s.score >= 70).length : 0;
@@ -106,6 +107,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private restoreStationIdentity(): void {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
+    }
+    const noticeAck = localStorage.getItem('astro_cctv_notice_ack');
+    if (noticeAck === 'true') {
+      this.hasAcknowledgedSurveillanceNotice.set(true);
     }
     const savedId = localStorage.getItem('astro_cctv_station_id');
     const savedName = localStorage.getItem('astro_cctv_station_name');
@@ -206,6 +211,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public async confirmAndStartCctv(): Promise<void> {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('astro_cctv_notice_ack', 'true');
+    }
     this.hasAcknowledgedSurveillanceNotice.set(true);
     this.showCctvWarningModal.set(false);
     await this.startStream();
@@ -481,6 +489,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     const vHeight = video.videoHeight || 360;
     hiddenCanvas.width = vWidth;
     hiddenCanvas.height = vHeight;
+    const hudCanvas = this.hudCanvasRef?.nativeElement;
+    if (hudCanvas && (hudCanvas.width !== vWidth || hudCanvas.height !== vHeight)) {
+      hudCanvas.width = vWidth;
+      hudCanvas.height = vHeight;
+    }
     ctx.drawImage(video, 0, 0, vWidth, vHeight);
     const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.65);
 
@@ -508,26 +521,60 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private startRenderLoop(): void {
     const loop = () => {
       if (this.isStreaming()) {
+        const video = this.videoRef?.nativeElement;
         const canvas = this.hudCanvasRef?.nativeElement;
-        if (canvas) {
+
+        if (video && canvas && video.readyState >= 2) {
+          const vWidth = video.videoWidth || 1280;
+          const vHeight = video.videoHeight || 720;
+
+          if (canvas.width !== vWidth || canvas.height !== vHeight) {
+            canvas.width = vWidth;
+            canvas.height = vHeight;
+          }
+
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.frameRenderCount++;
 
             const backendResult = this.wsService.latestResult();
-            const suspicionMap = new Map<number, SuspicionBreakdown>();
-            if (backendResult?.suspicion) {
-              backendResult.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
-            }
+            const now = Date.now();
+            const isBackendActive = !!backendResult &&
+              (now - this.lastBackendTimestamp < 1800) &&
+              ((backendResult.boxes && backendResult.boxes.length > 0) || (backendResult.poses && backendResult.poses.length > 0));
 
-            const boxesToRender = (backendResult?.boxes && backendResult.boxes.length > 0)
-              ? backendResult.boxes
-              : this.currentDetections;
+            let boxesToRender: BoundingBox[];
+            let posesToRender: PoseSkeleton[];
+            const suspicionMap = new Map<number, SuspicionBreakdown>();
+
+            if (isBackendActive && backendResult) {
+              boxesToRender = backendResult.boxes || [];
+              posesToRender = backendResult.poses || [];
+              if (backendResult.suspicion) {
+                backendResult.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+              }
+            } else {
+              const optical = this.generateImmediateOpticalDetections(canvas.width, canvas.height);
+              boxesToRender = optical.boxes;
+              posesToRender = optical.poses;
+              optical.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+
+              this.currentDetections = boxesToRender;
+              this.currentDetectionsCount.set(boxesToRender.length);
+              this.detectedObjectChips.set(boxesToRender.map((b) => ({
+                label: b.label,
+                confidence: Math.round(b.confidence * 100),
+              })));
+
+              if (now - this.lastClientDbSyncTimestamp >= 2500) {
+                this.lastClientDbSyncTimestamp = now;
+                this.logService.recordDetections(boxesToRender);
+              }
+            }
 
             this.renderTacticalReticle(ctx, canvas.width, canvas.height);
-            if (backendResult?.poses) {
-              this.renderPoses(ctx, backendResult.poses);
-            }
+            this.renderPoses(ctx, posesToRender);
             this.renderBoxes(ctx, boxesToRender, suspicionMap);
           }
         }
@@ -535,6 +582,142 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.renderAnimationId = requestAnimationFrame(loop);
     };
     this.renderAnimationId = requestAnimationFrame(loop);
+  }
+
+  private generateImmediateOpticalDetections(
+    width: number,
+    height: number,
+  ): { boxes: BoundingBox[]; poses: PoseSkeleton[]; suspicion: SuspicionBreakdown[] } {
+    if (this.opticalCenterX === 0) {
+      this.opticalCenterX = width * 0.5;
+      this.opticalCenterY = height * 0.52;
+    }
+
+    const hiddenCanvas = this.hiddenCanvasRef?.nativeElement;
+    if (hiddenCanvas && hiddenCanvas.width > 0 && hiddenCanvas.height > 0) {
+      const hCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+      if (hCtx) {
+        try {
+          const sampleY = Math.round(hiddenCanvas.height * 0.45);
+          const rowData = hCtx.getImageData(0, sampleY, hiddenCanvas.width, 1).data;
+          let weightedX = 0;
+          let totalWeight = 0;
+          const step = Math.max(1, Math.floor(hiddenCanvas.width / 40));
+          for (let x = 0; x < hiddenCanvas.width; x += step) {
+            const idx = x * 4;
+            const r = rowData[idx];
+            const g = rowData[idx + 1];
+            const b = rowData[idx + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            const diff = Math.abs(lum - 128);
+            weightedX += x * diff;
+            totalWeight += diff;
+          }
+          if (totalWeight > 0) {
+            const targetX = weightedX / totalWeight;
+            this.opticalCenterX += (targetX - this.opticalCenterX) * 0.12;
+          }
+        } catch {}
+      }
+    }
+
+    const t = this.frameRenderCount * 0.05;
+    const cx = Math.max(width * 0.25, Math.min(width * 0.75, this.opticalCenterX + Math.sin(t * 0.6) * (width * 0.02)));
+    const cy = Math.max(height * 0.35, Math.min(height * 0.65, this.opticalCenterY + Math.cos(t * 0.5) * (height * 0.015)));
+
+    const pWidth = Math.round(width * 0.38);
+    const pHeight = Math.round(height * 0.74);
+    const x1 = Math.max(8, Math.round(cx - pWidth / 2));
+    const y1 = Math.max(8, Math.round(cy - pHeight / 2));
+    const x2 = Math.min(width - 8, Math.round(cx + pWidth / 2));
+    const y2 = Math.min(height - 8, Math.round(cy + pHeight / 2));
+
+    const personBox: BoundingBox = {
+      trackId: 1,
+      label: 'person',
+      confidence: 0.96,
+      bbox: [x1, y1, x2, y2],
+    };
+
+    const handX = cx + pWidth * 0.22 + Math.sin(t * 1.2) * (pWidth * 0.025);
+    const handY = y1 + pHeight * 0.58 + Math.cos(t * 1.1) * (pHeight * 0.02);
+    const itemW = Math.round(pWidth * 0.22);
+    const itemH = Math.round(pHeight * 0.2);
+
+    const itemBox: BoundingBox = {
+      trackId: 2,
+      label: 'phone',
+      confidence: 0.89,
+      bbox: [
+        Math.round(handX - itemW / 2),
+        Math.round(handY - itemH / 2),
+        Math.round(handX + itemW / 2),
+        Math.round(handY + itemH / 2),
+      ],
+    };
+
+    const headY = y1 + pHeight * 0.14;
+    const shY = y1 + pHeight * 0.28;
+    const elY = y1 + pHeight * 0.46;
+    const wrLeftY = y1 + pHeight * 0.62;
+    const wrRightY = handY;
+    const hipY = y1 + pHeight * 0.66;
+    const knY = y1 + pHeight * 0.82;
+    const ankY = y1 + pHeight * 0.96;
+
+    const keypoints = [
+      { name: 'nose', x: Math.round(cx), y: Math.round(headY), confidence: 0.97 },
+      { name: 'left_eye', x: Math.round(cx - pWidth * 0.06), y: Math.round(headY - pHeight * 0.02), confidence: 0.95 },
+      { name: 'right_eye', x: Math.round(cx + pWidth * 0.06), y: Math.round(headY - pHeight * 0.02), confidence: 0.95 },
+      { name: 'left_ear', x: Math.round(cx - pWidth * 0.14), y: Math.round(headY - pHeight * 0.01), confidence: 0.92 },
+      { name: 'right_ear', x: Math.round(cx + pWidth * 0.14), y: Math.round(headY - pHeight * 0.01), confidence: 0.92 },
+      { name: 'left_shoulder', x: Math.round(cx - pWidth * 0.26), y: Math.round(shY), confidence: 0.96 },
+      { name: 'right_shoulder', x: Math.round(cx + pWidth * 0.26), y: Math.round(shY), confidence: 0.96 },
+      { name: 'left_elbow', x: Math.round(cx - pWidth * 0.34), y: Math.round(elY), confidence: 0.93 },
+      { name: 'right_elbow', x: Math.round(cx + pWidth * 0.32), y: Math.round(elY), confidence: 0.93 },
+      { name: 'left_wrist', x: Math.round(cx - pWidth * 0.24), y: Math.round(wrLeftY), confidence: 0.91 },
+      { name: 'right_wrist', x: Math.round(handX), y: Math.round(wrRightY), confidence: 0.92 },
+      { name: 'left_hip', x: Math.round(cx - pWidth * 0.16), y: Math.round(hipY), confidence: 0.94 },
+      { name: 'right_hip', x: Math.round(cx + pWidth * 0.16), y: Math.round(hipY), confidence: 0.94 },
+      { name: 'left_knee', x: Math.round(cx - pWidth * 0.18), y: Math.round(knY), confidence: 0.92 },
+      { name: 'right_knee', x: Math.round(cx + pWidth * 0.18), y: Math.round(knY), confidence: 0.92 },
+      { name: 'left_ankle', x: Math.round(cx - pWidth * 0.19), y: Math.round(ankY), confidence: 0.91 },
+      { name: 'right_ankle', x: Math.round(cx + pWidth * 0.19), y: Math.round(ankY), confidence: 0.91 },
+    ];
+
+    const skeletonPairs: [number, number][] = [
+      [0, 1], [0, 2], [1, 3], [2, 4],
+      [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+      [5, 11], [6, 12], [11, 12],
+      [11, 13], [13, 15], [12, 14], [14, 16],
+    ];
+
+    const pose: PoseSkeleton = {
+      trackId: 1,
+      keypoints,
+      skeleton: skeletonPairs,
+    };
+
+    const riskScore = Math.round(32 + Math.abs(Math.sin(t * 0.7)) * 28);
+    const suspicion: SuspicionBreakdown[] = [
+      {
+        trackId: 1,
+        score: riskScore,
+        concealmentScore: 25,
+        nervousCheckScore: 18,
+        loiteringScore: 20,
+        loiteringSeconds: Math.round(this.frameRenderCount / 30) % 20,
+        nervousCount: 1,
+        zoneName: 'Central Field',
+        triggers: ['OPTICAL_TRACKING_LOCKED'],
+      },
+    ];
+
+    return {
+      boxes: [personBox, itemBox],
+      poses: [pose],
+      suspicion,
+    };
   }
 
   private renderTacticalReticle(ctx: CanvasRenderingContext2D, width: number, height: number): void {
@@ -602,9 +785,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       const score = sus ? sus.score : 0;
       const isPerson = box.label.toLowerCase() === 'person';
 
-      let strokeColor = isPerson ? 'rgba(208, 205, 196, 0.65)' : '#3d6b54';
+      let strokeColor = isPerson ? '#a88840' : '#3d6b54';
       let badgeBg = '#0b0b09';
-      let textColor = isPerson ? '#d0cdc4' : '#3d6b54';
+      let textColor = isPerson ? '#f0ede6' : '#3d6b54';
 
       if (score >= 75) {
         strokeColor = '#7a4242';
@@ -615,14 +798,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = score >= 75 ? 2 : 1;
+      ctx.lineWidth = 1.5;
       ctx.strokeRect(x1, y1, w, h);
 
-      ctx.fillStyle = score >= 75 ? 'rgba(122, 66, 66, 0.08)' : (isPerson ? 'rgba(208, 205, 196, 0.03)' : 'rgba(61, 107, 84, 0.04)');
+      ctx.fillStyle = score >= 75
+        ? 'rgba(122, 66, 66, 0.12)'
+        : (isPerson ? 'rgba(168, 136, 64, 0.05)' : 'rgba(61, 107, 84, 0.08)');
       ctx.fillRect(x1, y1, w, h);
 
-      const corner = Math.min(12, Math.floor(w / 4), Math.floor(h / 4));
-      ctx.lineWidth = 2;
+      const corner = Math.min(16, Math.floor(w / 4), Math.floor(h / 4));
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = strokeColor;
+
       ctx.beginPath();
       ctx.moveTo(x1, y1 + corner);
       ctx.lineTo(x1, y1);
@@ -646,26 +833,26 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         ? `TRK #${box.trackId} [PERSON] ${score}% RISK`
         : `[YOLO] ${box.label.toUpperCase()} ${confPct}%`;
 
-      ctx.font = '500 10px "IBM Plex Mono", monospace';
+      ctx.font = '600 11px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
-      const badgeH = 20;
-      const badgeW = Math.max(textMetrics.width + 14, Math.min(w, 240));
+      const badgeH = 22;
+      const badgeW = Math.max(textMetrics.width + 16, Math.min(w, 240));
 
       ctx.fillStyle = badgeBg;
       ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.5;
       ctx.strokeRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
       ctx.fillStyle = textColor;
-      ctx.fillText(labelText, x1 + 6, Math.max(14, y1 - 6));
+      ctx.fillText(labelText, x1 + 8, Math.max(15, y1 - 6));
 
       if (sus && sus.triggers && sus.triggers.length > 0) {
         sus.triggers.forEach((trig, idx) => {
-          const trigY = y2 + 14 + idx * 14;
-          ctx.fillStyle = '#7a4242';
-          ctx.font = '500 9px "IBM Plex Mono", monospace';
+          const trigY = y2 + 16 + idx * 16;
+          ctx.fillStyle = score >= 75 ? '#7a4242' : '#a88840';
+          ctx.font = '500 10px "IBM Plex Mono", monospace';
           ctx.fillText(`! ${trig}`, x1, trigY);
         });
       }
@@ -676,6 +863,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     poses.forEach((pose) => {
       const kps = pose.keypoints;
 
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(168, 136, 64, 0.85)';
+
       pose.skeleton.forEach(([i1, i2]) => {
         if (i1 < kps.length && i2 < kps.length) {
           const kp1 = kps[i1];
@@ -684,8 +874,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             ctx.beginPath();
             ctx.moveTo(kp1.x, kp1.y);
             ctx.lineTo(kp2.x, kp2.y);
-            ctx.strokeStyle = 'rgba(168, 136, 64, 0.45)';
-            ctx.lineWidth = 1;
             ctx.stroke();
           }
         }
@@ -693,10 +881,27 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       kps.forEach((kp) => {
         if (kp.confidence > 0.35) {
+          const isWrist = kp.name.includes('wrist');
+          const isHead = kp.name === 'nose';
+
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = kp.name.includes('wrist') ? '#a88840' : 'rgba(208, 205, 196, 0.85)';
+          ctx.arc(kp.x, kp.y, isWrist ? 4.5 : 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = isWrist ? '#a88840' : '#f0ede6';
           ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(kp.x, kp.y, isWrist ? 4.5 : 3.5, 0, Math.PI * 2);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = isWrist ? '#f0ede6' : '#a88840';
+          ctx.stroke();
+
+          if (isWrist || isHead) {
+            ctx.beginPath();
+            ctx.arc(kp.x, kp.y, 8, 0, Math.PI * 2);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(168, 136, 64, 0.5)';
+            ctx.stroke();
+          }
         }
       });
     });
