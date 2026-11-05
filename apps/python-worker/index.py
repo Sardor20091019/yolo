@@ -7,10 +7,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from yolo_detector import YoloShopliftingDetector
 
 detector = YoloShopliftingDetector(
-    detection_model_path=os.getenv('YOLO_DETECTION_MODEL', 'yolo11n.pt'),
-    detection_fallback_path=os.getenv('YOLO_DETECTION_FALLBACK_MODEL', 'yolo11n.pt'),
-    pose_model_path=os.getenv('YOLO_POSE_MODEL', 'yolo11n-pose.pt'),
-    pose_fallback_path=os.getenv('YOLO_POSE_FALLBACK_MODEL', 'yolo11n-pose.pt')
+    detection_model_path=os.getenv('YOLO_DETECTION_MODEL', 'yolo26m.pt'),
+    detection_fallback_path=os.getenv('YOLO_DETECTION_FALLBACK_MODEL', 'yolo26m.pt'),
+    pose_model_path=os.getenv('YOLO_POSE_MODEL', 'yolo26m-pose.pt'),
+    pose_fallback_path=os.getenv('YOLO_POSE_FALLBACK_MODEL', 'yolo26m-pose.pt')
 )
 
 class handler(BaseHTTPRequestHandler):

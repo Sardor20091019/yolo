@@ -99,10 +99,10 @@ def run_ws_server(detector: YoloShopliftingDetector, host: str, port: int) -> No
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Shoplifting YOLO Detection Worker')
-    parser.add_argument('--detection-model', type=str, default='yolo11n.pt')
-    parser.add_argument('--detection-fallback', type=str, default='yolo11n.pt')
-    parser.add_argument('--pose-model', type=str, default='yolo11n-pose.pt')
-    parser.add_argument('--pose-fallback', type=str, default='yolo11n-pose.pt')
+    parser.add_argument('--detection-model', type=str, default='yolo26m.pt')
+    parser.add_argument('--detection-fallback', type=str, default='yolo26m.pt')
+    parser.add_argument('--pose-model', type=str, default='yolo26m-pose.pt')
+    parser.add_argument('--pose-fallback', type=str, default='yolo26m-pose.pt')
     parser.add_argument('--mode', type=str, choices=['ipc', 'ws'], default='ipc')
     parser.add_argument('--host', type=str, default='127.0.0.1')
     parser.add_argument('--port', type=int, default=5001)

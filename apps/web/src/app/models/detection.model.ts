@@ -37,6 +37,7 @@ export interface FrameResult {
   poses: PoseSkeleton[];
   suspicion: SuspicionBreakdown[];
   alertTriggered: boolean;
+  annotatedFrame?: string;
 }
 
 export interface DetectionZone {

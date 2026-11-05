@@ -61,6 +61,7 @@ export interface FrameProcessingResult {
   poses: PoseSkeleton[];
   suspicion: SuspicionBreakdown[];
   alertTriggered: boolean;
+  annotatedFrame?: string;
 }
 
 @Injectable()
@@ -188,8 +189,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     const configuredScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
     const workerScript = this.resolveWorkerScriptPath(configuredScript);
     const workerDir = path.dirname(workerScript);
-    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo11n.pt');
-    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo11n-pose.pt');
+    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo26m.pt');
+    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo26m-pose.pt');
 
     try {
       this.pythonProcess = spawn(pythonBin, [

@@ -525,11 +525,10 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
               : this.currentDetections;
 
             this.renderTacticalReticle(ctx, canvas.width, canvas.height);
-            this.renderBoxes(ctx, boxesToRender, suspicionMap);
-
             if (backendResult?.poses) {
               this.renderPoses(ctx, backendResult.poses);
             }
+            this.renderBoxes(ctx, boxesToRender, suspicionMap);
           }
         }
       }
@@ -586,8 +585,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     result.suspicion.forEach((s) => suspicionMap.set(s.trackId, s));
 
     const boxesToRender = (result.boxes && result.boxes.length > 0) ? result.boxes : this.currentDetections;
-    this.renderBoxes(ctx, boxesToRender, suspicionMap);
     this.renderPoses(ctx, result.poses);
+    this.renderBoxes(ctx, boxesToRender, suspicionMap);
   }
 
   private renderBoxes(

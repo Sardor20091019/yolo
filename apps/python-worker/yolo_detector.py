@@ -6,6 +6,7 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 import base64
 import time
 import math
+import concurrent.futures
 from typing import Dict, List, Any, Tuple, Optional
 from heuristics_engine import ShopliftingHeuristicsEngine
 
@@ -21,29 +22,6 @@ SKELETON_PAIRS = [
     [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
     [5, 11], [6, 12], [11, 12],
     [11, 13], [13, 15], [12, 14], [14, 16]
-]
-
-TEST_OBJECT_CATALOG = [
-    'keyboard',
-    'phone',
-    'mouse',
-    'chair',
-    'laptop',
-    'bottle',
-    'cup',
-    'backpack',
-    'book',
-    'watch',
-    'headphones',
-    'wallet',
-    'glasses',
-    'camera',
-    'umbrella',
-    'scissors',
-    'clock',
-    'shoe',
-    'desk',
-    'remote'
 ]
 
 MAP_COCO_TO_RETAIL = {
@@ -68,10 +46,10 @@ MAP_COCO_TO_RETAIL = {
 class YoloShopliftingDetector:
     def __init__(
         self,
-        detection_model_path: str = 'yolo11n.pt',
-        detection_fallback_path: str = 'yolo11n.pt',
-        pose_model_path: str = 'yolo11n-pose.pt',
-        pose_fallback_path: str = 'yolo11n-pose.pt'
+        detection_model_path: str = 'yolo26m.pt',
+        detection_fallback_path: str = 'yolo26m.pt',
+        pose_model_path: str = 'yolo26m-pose.pt',
+        pose_fallback_path: str = 'yolo26m-pose.pt'
     ):
         self.heuristics = ShopliftingHeuristicsEngine()
         self.detection_model = None
@@ -80,6 +58,7 @@ class YoloShopliftingDetector:
         self.np = None
         self.has_ultralytics = False
         self.simulation_step = 0
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
         self.initialize_models(
             detection_model_path,
@@ -87,6 +66,10 @@ class YoloShopliftingDetector:
             pose_model_path,
             pose_fallback_path
         )
+
+    def __del__(self) -> None:
+        if hasattr(self, 'executor') and self.executor:
+            self.executor.shutdown(wait=False)
 
     def initialize_models(
         self,
@@ -112,6 +95,8 @@ class YoloShopliftingDetector:
                     os.path.join(base_dir, name),
                     os.path.join(repo_dir, name),
                     os.path.join(os.getcwd(), name),
+                    os.path.join(base_dir, 'yolo26m.pt'),
+                    os.path.join(base_dir, 'yolo26m-pose.pt')
                 ]
                 for p in paths_to_check:
                     if os.path.isfile(p):
@@ -121,9 +106,9 @@ class YoloShopliftingDetector:
             det_candidates = [
                 resolve_model_file(det_path),
                 resolve_model_file(det_fallback),
+                resolve_model_file('yolo26m.pt'),
                 resolve_model_file('yolo11n.pt'),
-                resolve_model_file('yolov8n.pt'),
-                'yolo11n.pt',
+                'yolo26m.pt'
             ]
             for candidate in det_candidates:
                 try:
@@ -135,9 +120,9 @@ class YoloShopliftingDetector:
             pose_candidates = [
                 resolve_model_file(pose_path),
                 resolve_model_file(pose_fallback),
+                resolve_model_file('yolo26m-pose.pt'),
                 resolve_model_file('yolo11n-pose.pt'),
-                resolve_model_file('yolov8n-pose.pt'),
-                'yolo11n-pose.pt',
+                'yolo26m-pose.pt'
             ]
             for candidate in pose_candidates:
                 try:
@@ -165,6 +150,76 @@ class YoloShopliftingDetector:
         except Exception:
             return None
 
+    def predict_detection(self, image: Any, conf_thresh: float) -> List[Any]:
+        if not self.detection_model:
+            return []
+        try:
+            return self.detection_model.predict(
+                source=image,
+                conf=conf_thresh,
+                verbose=False
+            )
+        except Exception:
+            return []
+
+    def predict_pose(self, image: Any, conf_thresh: float) -> List[Any]:
+        if not self.pose_model:
+            return []
+        try:
+            return self.pose_model.predict(
+                source=image,
+                conf=conf_thresh,
+                verbose=False
+            )
+        except Exception:
+            return []
+
+    def overlay_stream_frame(
+        self,
+        image: Any,
+        poses: List[Dict[str, Any]],
+        boxes: List[Dict[str, Any]]
+    ) -> Any:
+        if self.cv2 is None:
+            return image
+
+        canvas = image.copy()
+
+        for pose in poses:
+            kps = pose.get('keypoints', [])
+            skel = pose.get('skeleton', SKELETON_PAIRS)
+            for pair in skel:
+                p1_idx, p2_idx = pair[0], pair[1]
+                if p1_idx < len(kps) and p2_idx < len(kps):
+                    pt1 = kps[p1_idx]
+                    pt2 = kps[p2_idx]
+                    if pt1.get('confidence', 0) >= 0.25 and pt2.get('confidence', 0) >= 0.25:
+                        c1 = (int(pt1['x']), int(pt1['y']))
+                        c2 = (int(pt2['x']), int(pt2['y']))
+                        self.cv2.line(canvas, c1, c2, (40, 210, 245), 2, self.cv2.LINE_AA)
+
+            for kp in kps:
+                if kp.get('confidence', 0) >= 0.25:
+                    pt = (int(kp['x']), int(kp['y']))
+                    self.cv2.circle(canvas, pt, 3, (60, 255, 120), -1, self.cv2.LINE_AA)
+
+        for b in boxes:
+            bbox = b.get('bbox', [0, 0, 0, 0])
+            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            label_name = b.get('label', 'object').upper()
+            conf_val = int(b.get('confidence', 0) * 100)
+            tag = f"{label_name} {conf_val}%"
+
+            rect_color = (60, 60, 225) if b.get('label') == 'person' else (225, 160, 45)
+            self.cv2.rectangle(canvas, (x1, y1), (x2, y2), rect_color, 2, self.cv2.LINE_AA)
+
+            (tw, th), _ = self.cv2.getTextSize(tag, self.cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)
+            top_y = max(0, y1 - th - 6)
+            self.cv2.rectangle(canvas, (x1, top_y), (x1 + tw + 6, top_y + th + 6), rect_color, -1)
+            self.cv2.putText(canvas, tag, (x1 + 3, top_y + th + 1), self.cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, self.cv2.LINE_AA)
+
+        return canvas
+
     def process_frame(
         self,
         frame_data: str,
@@ -173,7 +228,6 @@ class YoloShopliftingDetector:
         calibration: Dict[str, Any]
     ) -> Dict[str, Any]:
         conf_thresh = float(calibration.get('confidenceThreshold', 0.35))
-        now = time.time()
 
         if self.has_ultralytics:
             image = self.decode_frame(frame_data)
@@ -186,7 +240,8 @@ class YoloShopliftingDetector:
             'boxes': [],
             'poses': [],
             'suspicion': [],
-            'alertTriggered': False
+            'alertTriggered': False,
+            'annotatedFrame': ''
         }
 
     def run_yolo_inference(
@@ -202,92 +257,88 @@ class YoloShopliftingDetector:
         suspicion_out: List[Dict[str, Any]] = []
         detected_items: List[Dict[str, Any]] = []
 
-        has_person = False
-        try:
-            det_results = self.detection_model.predict(
-                source=image,
-                conf=conf_thresh,
-                verbose=False
-            )
+        future_det = self.executor.submit(self.predict_detection, image, conf_thresh)
+        future_pose = self.executor.submit(self.predict_pose, image, conf_thresh)
 
-            for r in det_results:
-                boxes = r.boxes
-                if boxes is None:
-                    continue
-                for i in range(len(boxes)):
-                    xyxy = boxes.xyxy[i].cpu().numpy().tolist()
-                    cls_id = int(boxes.cls[i].item())
-                    conf = float(boxes.conf[i].item())
-                    raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}').lower()
-                    track_id = int(boxes.id[i].item()) if boxes.id is not None and boxes.id[i] is not None else (i + 1)
+        det_results = future_det.result()
+        pose_results = future_pose.result()
 
-                    if raw_label in MAP_COCO_TO_RETAIL:
-                        label = MAP_COCO_TO_RETAIL[raw_label]
-                    elif raw_label != 'person':
-                        label = raw_label
-                    else:
-                        label = 'person'
-                        has_person = True
+        for r in det_results:
+            boxes = getattr(r, 'boxes', None)
+            if boxes is None:
+                continue
+            for i in range(len(boxes)):
+                xyxy = boxes.xyxy[i].cpu().numpy().tolist()
+                cls_id = int(boxes.cls[i].item())
+                conf = float(boxes.conf[i].item())
+                raw_label = self.detection_model.names.get(cls_id, f'class_{cls_id}').lower()
+                track_id = int(boxes.id[i].item()) if getattr(boxes, 'id', None) is not None and boxes.id[i] is not None else (i + 1)
 
-                    item_info = {
-                        'trackId': track_id,
-                        'label': label,
-                        'confidence': round(conf, 2),
-                        'bbox': [round(x, 1) for x in xyxy]
-                    }
-                    boxes_out.append(item_info)
-                    if label != 'person':
-                        detected_items.append(item_info)
-        except Exception:
-            pass
+                if raw_label in MAP_COCO_TO_RETAIL:
+                    label = MAP_COCO_TO_RETAIL[raw_label]
+                elif raw_label != 'person':
+                    label = raw_label
+                else:
+                    label = 'person'
 
-        if has_person and self.pose_model is not None:
-            try:
-                pose_results = self.pose_model.predict(
-                    source=image,
-                    conf=conf_thresh,
-                    verbose=False
+                item_info = {
+                    'trackId': track_id,
+                    'label': label,
+                    'confidence': round(conf, 2),
+                    'bbox': [round(x, 1) for x in xyxy]
+                }
+                boxes_out.append(item_info)
+                if label != 'person':
+                    detected_items.append(item_info)
+
+        for pr in pose_results:
+            p_boxes = getattr(pr, 'boxes', None)
+            p_keypoints = getattr(pr, 'keypoints', None)
+            if p_boxes is None or p_keypoints is None:
+                continue
+
+            for i in range(len(p_boxes)):
+                p_track_id = int(p_boxes.id[i].item()) if getattr(p_boxes, 'id', None) is not None and p_boxes.id[i] is not None else (i + 1)
+                pxyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
+                kp_data = p_keypoints.data[i].cpu().numpy()
+
+                formatted_kps = []
+                for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
+                    kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
+                    formatted_kps.append({
+                        'x': round(kx, 1),
+                        'y': round(ky, 1),
+                        'confidence': round(kc, 2),
+                        'name': KEYPOINT_NAMES[k_idx]
+                    })
+
+                poses_out.append({
+                    'trackId': p_track_id,
+                    'keypoints': formatted_kps,
+                    'skeleton': SKELETON_PAIRS
+                })
+
+                sus_result = self.heuristics.evaluate_person(
+                    p_track_id,
+                    tuple(pxyxy),
+                    formatted_kps,
+                    detected_items,
+                    zones,
+                    calibration
                 )
-                for pr in pose_results:
-                    p_boxes = pr.boxes
-                    p_keypoints = pr.keypoints
-                    if p_boxes is None or p_keypoints is None:
-                        continue
-
-                    for i in range(len(p_boxes)):
-                        p_track_id = int(p_boxes.id[i].item()) if p_boxes.id is not None and p_boxes.id[i] is not None else (i + 1)
-                        pxyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
-                        kp_data = p_keypoints.data[i].cpu().numpy()
-
-                        formatted_kps = []
-                        for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
-                            kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
-                            formatted_kps.append({
-                                'x': round(kx, 1),
-                                'y': round(ky, 1),
-                                'confidence': round(kc, 2),
-                                'name': KEYPOINT_NAMES[k_idx]
-                            })
-
-                        poses_out.append({
-                            'trackId': p_track_id,
-                            'keypoints': formatted_kps,
-                            'skeleton': SKELETON_PAIRS
-                        })
-
-                        sus_result = self.heuristics.evaluate_person(
-                            p_track_id,
-                            tuple(pxyxy),
-                            formatted_kps,
-                            detected_items,
-                            zones,
-                            calibration
-                        )
-                        suspicion_out.append(sus_result)
-            except Exception:
-                pass
+                suspicion_out.append(sus_result)
 
         self.heuristics.cleanup_stale_tracks()
+
+        annotated_buffer = self.overlay_stream_frame(image, poses_out, boxes_out)
+        annotated_base64 = ''
+        if self.cv2 is not None:
+            try:
+                ret, buf = self.cv2.imencode('.jpg', annotated_buffer, [int(self.cv2.IMWRITE_JPEG_QUALITY), 70])
+                if ret:
+                    annotated_base64 = 'data:image/jpeg;base64,' + base64.b64encode(buf).decode('utf-8')
+            except Exception:
+                pass
 
         return {
             'frameIndex': frame_index,
@@ -295,6 +346,6 @@ class YoloShopliftingDetector:
             'boxes': boxes_out,
             'poses': poses_out,
             'suspicion': suspicion_out,
-            'alertTriggered': any(s['score'] >= float(calibration.get('suspicionThreshold', 75)) for s in suspicion_out)
+            'alertTriggered': any(s['score'] >= float(calibration.get('suspicionThreshold', 75)) for s in suspicion_out),
+            'annotatedFrame': annotated_base64
         }
-
