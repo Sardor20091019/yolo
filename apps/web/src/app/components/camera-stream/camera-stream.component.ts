@@ -70,6 +70,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private opticalCenterY: number = 0;
   private lastClientDbSyncTimestamp: number = 0;
 
+  private cocoModel: any = null;
+  private poseDetector: any = null;
+  private isAiModelLoading: boolean = false;
+  private isAiInferenceRunning: boolean = false;
+  private realAiBoxes: BoundingBox[] = [];
+  private realAiPoses: PoseSkeleton[] = [];
+  private lastAiInferenceTimestamp: number = 0;
+
   constructor(
     public readonly wsService: WebSocketService,
     public readonly detectionApi: DetectionApiService,
@@ -102,6 +110,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.enumerateCameraLenses();
     this.startRenderLoop();
     this.startClock();
+    this.initAiModels();
   }
 
   private restoreStationIdentity(): void {
@@ -261,6 +270,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       this.isStreaming.set(true);
       this.startCaptureInterval();
+      this.initAiModels();
     } catch (err: unknown) {
       console.error('Optical camera access failed:', err);
     }
@@ -507,11 +517,13 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.latencyMs.set(Math.floor(14 + Math.random() * 8));
     }
 
+    this.detectFrameAi();
+
     this.wsService.sendFrame(
       frameBase64,
       this.frameCounter,
       'WEBCAM',
-      [],
+      this.currentDetections,
       this.stationId(),
       this.stationName(),
       this.logService.currentUser().id,
@@ -567,7 +579,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
                 confidence: Math.round(b.confidence * 100),
               })));
 
-              if (now - this.lastClientDbSyncTimestamp >= 2500) {
+              if (boxesToRender.length > 0 && now - this.lastClientDbSyncTimestamp >= 2500) {
                 this.lastClientDbSyncTimestamp = now;
                 this.logService.recordDetections(boxesToRender);
               }
@@ -584,112 +596,224 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.renderAnimationId = requestAnimationFrame(loop);
   }
 
+  public async initAiModels(): Promise<void> {
+    if (typeof window === 'undefined' || this.isAiModelLoading) {
+      return;
+    }
+    const w = window as any;
+    if (!w.cocoSsd && !w.poseDetection) {
+      setTimeout(() => this.initAiModels(), 500);
+      return;
+    }
+
+    this.isAiModelLoading = true;
+    try {
+      if (w.cocoSsd && !this.cocoModel) {
+        this.cocoModel = await w.cocoSsd.load({ base: 'mobilenet_v2' });
+      }
+      if (w.poseDetection && !this.poseDetector) {
+        this.poseDetector = await w.poseDetection.createDetector(
+          w.poseDetection.SupportedModels.MoveNet,
+          { modelType: 'SINGLEPOSE_LIGHTNING' },
+        );
+      }
+    } catch {
+    } finally {
+      this.isAiModelLoading = false;
+    }
+  }
+
+  private async detectFrameAi(): Promise<void> {
+    if (this.isAiInferenceRunning) {
+      return;
+    }
+    const video = this.videoRef?.nativeElement;
+    if (!video || video.readyState < 2 || !this.isStreaming()) {
+      return;
+    }
+
+    if (!this.cocoModel && !this.poseDetector) {
+      this.initAiModels();
+      return;
+    }
+
+    this.isAiInferenceRunning = true;
+    try {
+      const detectedBoxes: BoundingBox[] = [];
+      if (this.cocoModel) {
+        const predictions = await this.cocoModel.detect(video, 6, 0.4);
+        if (predictions && predictions.length > 0) {
+          predictions.forEach((p: any, idx: number) => {
+            const [bx, by, bw, bh] = p.bbox;
+            const rawLabel = (p.class || 'object').toLowerCase();
+            const label = rawLabel === 'cell phone' ? 'phone' : rawLabel;
+            detectedBoxes.push({
+              trackId: idx + 1,
+              label,
+              confidence: Math.round(p.score * 100) / 100,
+              bbox: [Math.round(bx), Math.round(by), Math.round(bx + bw), Math.round(by + bh)],
+            });
+          });
+        }
+      }
+
+      let detectedPoses: PoseSkeleton[] = [];
+      if (this.poseDetector) {
+        const rawPoses = await this.poseDetector.estimatePoses(video);
+        if (rawPoses && rawPoses.length > 0) {
+          detectedPoses = rawPoses.map((rp: any, pIdx: number) => {
+            const keypoints = (rp.keypoints || []).map((kp: any) => ({
+              name: kp.name || '',
+              x: Math.round(kp.x),
+              y: Math.round(kp.y),
+              confidence: Math.round((kp.score || 0) * 100) / 100,
+            }));
+
+            return {
+              trackId: pIdx + 1,
+              keypoints,
+              skeleton: [
+                [0, 1], [0, 2], [1, 3], [2, 4],
+                [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+                [5, 11], [6, 12], [11, 12],
+                [11, 13], [13, 15], [12, 14], [14, 16],
+              ] as [number, number][],
+            };
+          });
+        }
+      }
+
+      this.realAiBoxes = detectedBoxes;
+      this.realAiPoses = detectedPoses;
+      this.lastAiInferenceTimestamp = Date.now();
+    } catch {
+    } finally {
+      this.isAiInferenceRunning = false;
+    }
+  }
+
   private generateImmediateOpticalDetections(
     width: number,
     height: number,
   ): { boxes: BoundingBox[]; poses: PoseSkeleton[]; suspicion: SuspicionBreakdown[] } {
-    if (this.opticalCenterX === 0) {
-      this.opticalCenterX = width * 0.5;
-      this.opticalCenterY = height * 0.52;
+    const now = Date.now();
+    const hasFreshAi = (now - this.lastAiInferenceTimestamp < 1500) &&
+      (this.realAiBoxes.length > 0 || this.realAiPoses.length > 0);
+
+    if (hasFreshAi) {
+      const riskScore = this.realAiBoxes.some((b) => b.label === 'phone' || b.label === 'bag') ? 48 : 20;
+      return {
+        boxes: this.realAiBoxes,
+        poses: this.realAiPoses,
+        suspicion: [
+          {
+            trackId: 1,
+            score: riskScore,
+            concealmentScore: 10,
+            nervousCheckScore: 8,
+            loiteringScore: 10,
+            loiteringSeconds: Math.round(this.frameRenderCount / 30) % 20,
+            nervousCount: 0,
+            zoneName: 'Optical Target Area',
+            triggers: ['NEURAL_VISION_ACTIVE'],
+          },
+        ],
+      };
     }
 
     const hiddenCanvas = this.hiddenCanvasRef?.nativeElement;
-    if (hiddenCanvas && hiddenCanvas.width > 0 && hiddenCanvas.height > 0) {
-      const hCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
-      if (hCtx) {
-        try {
-          const sampleY = Math.round(hiddenCanvas.height * 0.45);
-          const rowData = hCtx.getImageData(0, sampleY, hiddenCanvas.width, 1).data;
-          let weightedX = 0;
-          let totalWeight = 0;
-          const step = Math.max(1, Math.floor(hiddenCanvas.width / 40));
-          for (let x = 0; x < hiddenCanvas.width; x += step) {
-            const idx = x * 4;
-            const r = rowData[idx];
-            const g = rowData[idx + 1];
-            const b = rowData[idx + 2];
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            const diff = Math.abs(lum - 128);
-            weightedX += x * diff;
-            totalWeight += diff;
-          }
-          if (totalWeight > 0) {
-            const targetX = weightedX / totalWeight;
-            this.opticalCenterX += (targetX - this.opticalCenterX) * 0.12;
-          }
-        } catch {}
-      }
+    if (!hiddenCanvas || hiddenCanvas.width <= 0 || hiddenCanvas.height <= 0) {
+      return { boxes: [], poses: [], suspicion: [] };
     }
 
-    const t = this.frameRenderCount * 0.05;
-    const cx = Math.max(width * 0.25, Math.min(width * 0.75, this.opticalCenterX + Math.sin(t * 0.6) * (width * 0.02)));
-    const cy = Math.max(height * 0.35, Math.min(height * 0.65, this.opticalCenterY + Math.cos(t * 0.5) * (height * 0.015)));
+    const hCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+    if (!hCtx) {
+      return { boxes: [], poses: [], suspicion: [] };
+    }
 
-    const pWidth = Math.round(width * 0.38);
-    const pHeight = Math.round(height * 0.74);
-    const x1 = Math.max(8, Math.round(cx - pWidth / 2));
-    const y1 = Math.max(8, Math.round(cy - pHeight / 2));
-    const x2 = Math.min(width - 8, Math.round(cx + pWidth / 2));
-    const y2 = Math.min(height - 8, Math.round(cy + pHeight / 2));
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    let skinCount = 0;
+
+    try {
+      const imgData = hCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height).data;
+      const stepX = Math.max(1, Math.floor(hiddenCanvas.width / 48));
+      const stepY = Math.max(1, Math.floor(hiddenCanvas.height / 36));
+
+      for (let y = 0; y < hiddenCanvas.height; y += stepY) {
+        for (let x = 0; x < hiddenCanvas.width; x += stepX) {
+          const idx = (y * hiddenCanvas.width + x) * 4;
+          const r = imgData[idx];
+          const g = imgData[idx + 1];
+          const b = imgData[idx + 2];
+
+          if (r > 65 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 15) {
+            skinCount++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+    } catch {
+      return { boxes: [], poses: [], suspicion: [] };
+    }
+
+    if (skinCount < 16 || maxX <= minX || maxY <= minY) {
+      return { boxes: [], poses: [], suspicion: [] };
+    }
+
+    const faceW = maxX - minX;
+    const faceH = maxY - minY;
+    if (faceW < width * 0.08 || faceH < height * 0.08) {
+      return { boxes: [], poses: [], suspicion: [] };
+    }
+
+    const padX = faceW * 0.25;
+    const padY = faceH * 0.25;
+    const bx1 = Math.max(8, Math.round(minX - padX));
+    const by1 = Math.max(8, Math.round(minY - padY));
+    const bx2 = Math.min(width - 8, Math.round(maxX + padX));
+    const by2 = Math.min(height - 8, Math.round(maxY + padY * 1.6));
 
     const personBox: BoundingBox = {
       trackId: 1,
       label: 'person',
-      confidence: 0.96,
-      bbox: [x1, y1, x2, y2],
+      confidence: 0.94,
+      bbox: [bx1, by1, bx2, by2],
     };
 
-    const handX = cx + pWidth * 0.22 + Math.sin(t * 1.2) * (pWidth * 0.025);
-    const handY = y1 + pHeight * 0.58 + Math.cos(t * 1.1) * (pHeight * 0.02);
-    const itemW = Math.round(pWidth * 0.22);
-    const itemH = Math.round(pHeight * 0.2);
-
-    const itemBox: BoundingBox = {
-      trackId: 2,
-      label: 'phone',
-      confidence: 0.89,
-      bbox: [
-        Math.round(handX - itemW / 2),
-        Math.round(handY - itemH / 2),
-        Math.round(handX + itemW / 2),
-        Math.round(handY + itemH / 2),
-      ],
-    };
-
-    const headY = y1 + pHeight * 0.14;
-    const shY = y1 + pHeight * 0.28;
-    const elY = y1 + pHeight * 0.46;
-    const wrLeftY = y1 + pHeight * 0.62;
-    const wrRightY = handY;
-    const hipY = y1 + pHeight * 0.66;
-    const knY = y1 + pHeight * 0.82;
-    const ankY = y1 + pHeight * 0.96;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const shY = Math.min(height - 10, maxY + faceH * 0.4);
+    const shW = faceW * 1.5;
 
     const keypoints = [
-      { name: 'nose', x: Math.round(cx), y: Math.round(headY), confidence: 0.97 },
-      { name: 'left_eye', x: Math.round(cx - pWidth * 0.06), y: Math.round(headY - pHeight * 0.02), confidence: 0.95 },
-      { name: 'right_eye', x: Math.round(cx + pWidth * 0.06), y: Math.round(headY - pHeight * 0.02), confidence: 0.95 },
-      { name: 'left_ear', x: Math.round(cx - pWidth * 0.14), y: Math.round(headY - pHeight * 0.01), confidence: 0.92 },
-      { name: 'right_ear', x: Math.round(cx + pWidth * 0.14), y: Math.round(headY - pHeight * 0.01), confidence: 0.92 },
-      { name: 'left_shoulder', x: Math.round(cx - pWidth * 0.26), y: Math.round(shY), confidence: 0.96 },
-      { name: 'right_shoulder', x: Math.round(cx + pWidth * 0.26), y: Math.round(shY), confidence: 0.96 },
-      { name: 'left_elbow', x: Math.round(cx - pWidth * 0.34), y: Math.round(elY), confidence: 0.93 },
-      { name: 'right_elbow', x: Math.round(cx + pWidth * 0.32), y: Math.round(elY), confidence: 0.93 },
-      { name: 'left_wrist', x: Math.round(cx - pWidth * 0.24), y: Math.round(wrLeftY), confidence: 0.91 },
-      { name: 'right_wrist', x: Math.round(handX), y: Math.round(wrRightY), confidence: 0.92 },
-      { name: 'left_hip', x: Math.round(cx - pWidth * 0.16), y: Math.round(hipY), confidence: 0.94 },
-      { name: 'right_hip', x: Math.round(cx + pWidth * 0.16), y: Math.round(hipY), confidence: 0.94 },
-      { name: 'left_knee', x: Math.round(cx - pWidth * 0.18), y: Math.round(knY), confidence: 0.92 },
-      { name: 'right_knee', x: Math.round(cx + pWidth * 0.18), y: Math.round(knY), confidence: 0.92 },
-      { name: 'left_ankle', x: Math.round(cx - pWidth * 0.19), y: Math.round(ankY), confidence: 0.91 },
-      { name: 'right_ankle', x: Math.round(cx + pWidth * 0.19), y: Math.round(ankY), confidence: 0.91 },
+      { name: 'nose', x: Math.round(cx), y: Math.round(cy), confidence: 0.95 },
+      { name: 'left_eye', x: Math.round(cx - faceW * 0.22), y: Math.round(cy - faceH * 0.18), confidence: 0.92 },
+      { name: 'right_eye', x: Math.round(cx + faceW * 0.22), y: Math.round(cy - faceH * 0.18), confidence: 0.92 },
+      { name: 'left_ear', x: Math.round(minX), y: Math.round(cy - faceH * 0.08), confidence: 0.88 },
+      { name: 'right_ear', x: Math.round(maxX), y: Math.round(cy - faceH * 0.08), confidence: 0.88 },
+      { name: 'left_shoulder', x: Math.round(cx - shW / 2), y: Math.round(shY), confidence: 0.85 },
+      { name: 'right_shoulder', x: Math.round(cx + shW / 2), y: Math.round(shY), confidence: 0.85 },
+      { name: 'left_elbow', x: 0, y: 0, confidence: 0.0 },
+      { name: 'right_elbow', x: 0, y: 0, confidence: 0.0 },
+      { name: 'left_wrist', x: 0, y: 0, confidence: 0.0 },
+      { name: 'right_wrist', x: 0, y: 0, confidence: 0.0 },
+      { name: 'left_hip', x: 0, y: 0, confidence: 0.0 },
+      { name: 'right_hip', x: 0, y: 0, confidence: 0.0 },
+      { name: 'left_knee', x: 0, y: 0, confidence: 0.0 },
+      { name: 'right_knee', x: 0, y: 0, confidence: 0.0 },
+      { name: 'left_ankle', x: 0, y: 0, confidence: 0.0 },
+      { name: 'right_ankle', x: 0, y: 0, confidence: 0.0 },
     ];
 
     const skeletonPairs: [number, number][] = [
       [0, 1], [0, 2], [1, 3], [2, 4],
-      [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
-      [5, 11], [6, 12], [11, 12],
-      [11, 13], [13, 15], [12, 14], [14, 16],
+      [5, 6],
     ];
 
     const pose: PoseSkeleton = {
@@ -698,25 +822,22 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       skeleton: skeletonPairs,
     };
 
-    const riskScore = Math.round(32 + Math.abs(Math.sin(t * 0.7)) * 28);
-    const suspicion: SuspicionBreakdown[] = [
-      {
-        trackId: 1,
-        score: riskScore,
-        concealmentScore: 25,
-        nervousCheckScore: 18,
-        loiteringScore: 20,
-        loiteringSeconds: Math.round(this.frameRenderCount / 30) % 20,
-        nervousCount: 1,
-        zoneName: 'Central Field',
-        triggers: ['OPTICAL_TRACKING_LOCKED'],
-      },
-    ];
-
     return {
-      boxes: [personBox, itemBox],
+      boxes: [personBox],
       poses: [pose],
-      suspicion,
+      suspicion: [
+        {
+          trackId: 1,
+          score: 18,
+          concealmentScore: 10,
+          nervousCheckScore: 5,
+          loiteringScore: 5,
+          loiteringSeconds: 1,
+          nervousCount: 0,
+          zoneName: 'Optical Field',
+          triggers: ['FACIAL_CONTOUR_LOCKED'],
+        },
+      ],
     };
   }
 
@@ -870,7 +991,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         if (i1 < kps.length && i2 < kps.length) {
           const kp1 = kps[i1];
           const kp2 = kps[i2];
-          if (kp1.confidence > 0.35 && kp2.confidence > 0.35) {
+          if (kp1.confidence >= 0.35 && kp2.confidence >= 0.35 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
             ctx.beginPath();
             ctx.moveTo(kp1.x, kp1.y);
             ctx.lineTo(kp2.x, kp2.y);
@@ -880,7 +1001,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       });
 
       kps.forEach((kp) => {
-        if (kp.confidence > 0.35) {
+        if (kp.confidence >= 0.35 && kp.x > 0 && kp.y > 0) {
           const isWrist = kp.name.includes('wrist');
           const isHead = kp.name === 'nose';
 

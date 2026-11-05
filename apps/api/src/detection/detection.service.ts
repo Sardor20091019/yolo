@@ -458,69 +458,12 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private createFallbackResult(frameIndex: number): FrameProcessingResult {
-    const t = (frameIndex % 360) * 0.08;
-    const cx = 320 + Math.sin(t * 0.4) * 40;
-    const cy = 240 + Math.cos(t * 0.3) * 15;
     return {
       frameIndex,
       timestamp: Date.now(),
-      boxes: [
-        {
-          trackId: 1,
-          label: 'person',
-          confidence: 0.94,
-          bbox: [Math.round(cx - 85), Math.round(cy - 150), Math.round(cx + 85), Math.round(cy + 160)],
-        },
-        {
-          trackId: 2,
-          label: 'phone',
-          confidence: 0.88,
-          bbox: [Math.round(cx + 15 + Math.sin(t) * 8), Math.round(cy + 40), Math.round(cx + 55 + Math.sin(t) * 8), Math.round(cy + 90)],
-        },
-      ],
-      poses: [
-        {
-          trackId: 1,
-          skeleton: [
-            [0, 1], [0, 2], [1, 3], [2, 4],
-            [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
-            [5, 11], [6, 12], [11, 12],
-            [11, 13], [13, 15], [12, 14], [14, 16],
-          ],
-          keypoints: [
-            { name: 'nose', x: Math.round(cx), y: Math.round(cy - 110), confidence: 0.96 },
-            { name: 'left_eye', x: Math.round(cx - 10), y: Math.round(cy - 116), confidence: 0.94 },
-            { name: 'right_eye', x: Math.round(cx + 10), y: Math.round(cy - 116), confidence: 0.94 },
-            { name: 'left_ear', x: Math.round(cx - 22), y: Math.round(cy - 114), confidence: 0.91 },
-            { name: 'right_ear', x: Math.round(cx + 22), y: Math.round(cy - 114), confidence: 0.91 },
-            { name: 'left_shoulder', x: Math.round(cx - 45), y: Math.round(cy - 65), confidence: 0.95 },
-            { name: 'right_shoulder', x: Math.round(cx + 45), y: Math.round(cy - 65), confidence: 0.95 },
-            { name: 'left_elbow', x: Math.round(cx - 58), y: Math.round(cy - 15), confidence: 0.92 },
-            { name: 'right_elbow', x: Math.round(cx + 52), y: Math.round(cy - 15), confidence: 0.92 },
-            { name: 'left_wrist', x: Math.round(cx - 38), y: Math.round(cy + 37), confidence: 0.89 },
-            { name: 'right_wrist', x: Math.round(cx + 35), y: Math.round(cy + 45 + Math.sin(t) * 12), confidence: 0.89 },
-            { name: 'left_hip', x: Math.round(cx - 28), y: Math.round(cy + 50), confidence: 0.93 },
-            { name: 'right_hip', x: Math.round(cx + 28), y: Math.round(cy + 50), confidence: 0.93 },
-            { name: 'left_knee', x: Math.round(cx - 30), y: Math.round(cy + 105), confidence: 0.91 },
-            { name: 'right_knee', x: Math.round(cx + 30), y: Math.round(cy + 105), confidence: 0.91 },
-            { name: 'left_ankle', x: Math.round(cx - 32), y: Math.round(cy + 155), confidence: 0.90 },
-            { name: 'right_ankle', x: Math.round(cx + 32), y: Math.round(cy + 155), confidence: 0.90 },
-          ],
-        },
-      ],
-      suspicion: [
-        {
-          trackId: 1,
-          score: 42,
-          concealmentScore: 35,
-          nervousCheckScore: 20,
-          loiteringScore: 25,
-          loiteringSeconds: 4,
-          nervousCount: 1,
-          zoneName: 'Central Observation',
-          triggers: ['OPTICAL_HEURISTIC_SYNC'],
-        },
-      ],
+      boxes: [],
+      poses: [],
+      suspicion: [],
       alertTriggered: false,
     };
   }
