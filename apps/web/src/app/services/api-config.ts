@@ -20,3 +20,4 @@ export function getApiBaseUrl(): string {
 export function getSocketUrl(): string {
   return getBackendBaseUrl();
 }
+

@@ -34,5 +34,11 @@ export default (): AppConfig => ({
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   },
+  jwt: {
+    accessSecret: process.env.JWT_ACCESS_SECRET || 'astro_cctv_access_secret_key_prod_32chars!',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'astro_cctv_refresh_secret_key_prod_32chars!',
+    accessExpiresInSeconds: parseInt(process.env.JWT_ACCESS_EXPIRES_IN_SECONDS || '900', 10),
+    refreshExpiresInSeconds: parseInt(process.env.JWT_REFRESH_EXPIRES_IN_SECONDS || '604800', 10),
+  },
 });
 

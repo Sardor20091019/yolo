@@ -32,5 +32,11 @@ export interface AppConfig {
     clientId: string;
     clientSecret: string;
   };
+  jwt: {
+    accessSecret: string;
+    refreshSecret: string;
+    accessExpiresInSeconds: number;
+    refreshExpiresInSeconds: number;
+  };
 }
 

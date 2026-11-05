@@ -10,6 +10,8 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .addColumn('name', 'varchar(128)', (col) => col.notNull())
     .addColumn('picture', 'text', (col) => col.notNull().defaultTo(''))
     .addColumn('role', 'varchar(32)', (col) => col.notNull().defaultTo('OPERATOR'))
+    .addColumn('refresh_token_hash', 'text')
+    .addColumn('refresh_token_expires_at', 'timestamptz')
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
     .addColumn('updated_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
     .execute();
@@ -75,6 +77,20 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     await db.schema
       .alterTable('detection_logs')
       .addColumn('user_id', 'varchar(128)')
+      .execute();
+  } catch {}
+
+  try {
+    await db.schema
+      .alterTable('users')
+      .addColumn('refresh_token_hash', 'text')
+      .execute();
+  } catch {}
+
+  try {
+    await db.schema
+      .alterTable('users')
+      .addColumn('refresh_token_expires_at', 'timestamptz')
       .execute();
   } catch {}
 }

@@ -1,7 +1,26 @@
-import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { GoogleAuthDto, AuthUserProfile, AuthConfigResponse } from './auth.dto';
+import {
+  GoogleAuthDto,
+  LoginDto,
+  RefreshTokenDto,
+  LogoutDto,
+  TokenPairResponse,
+  AuthConfigResponse,
+  JwtTokenPayload,
+} from './auth.dto';
 import { UserRecord } from '../database/database.types';
+import { JwtAuthGuard, AuthenticatedRequest } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -12,12 +31,44 @@ export class AuthController {
     return this.authService.getPublicConfig();
   }
 
+  @Post('login')
+  public async login(@Body() dto: LoginDto): Promise<TokenPairResponse> {
+    return await this.authService.login(dto);
+  }
+
   @Post('google')
-  public async authenticateGoogle(@Body() dto: GoogleAuthDto): Promise<{ user: AuthUserProfile; token: string }> {
-    const user = await this.authService.verifyGoogleCredential(dto.credential);
+  public async authenticateGoogle(@Body() dto: GoogleAuthDto): Promise<TokenPairResponse> {
+    return await this.authService.authenticateGoogle(dto.credential);
+  }
+
+  @Post('refresh')
+  public async refreshTokens(@Body() dto: RefreshTokenDto): Promise<TokenPairResponse> {
+    return await this.authService.refreshTokens(dto.refreshToken);
+  }
+
+  @Post('logout')
+  public async logout(
+    @Body() dto: LogoutDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ success: boolean; message: string }> {
+    if (dto.refreshToken) {
+      return await this.authService.logoutByRefreshToken(dto.refreshToken);
+    }
+    if (req.user?.sub) {
+      return await this.authService.logout(req.user.sub);
+    }
+    return { success: true, message: 'Logged out' };
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  public async getProfile(
+    @CurrentUser() user: JwtTokenPayload,
+  ): Promise<{ user: UserRecord | undefined; claims: JwtTokenPayload }> {
+    const record = await this.authService.getUserById(user.sub);
     return {
-      user,
-      token: `cctv_session_${user.id}_${Date.now()}`,
+      user: record,
+      claims: user,
     };
   }
 

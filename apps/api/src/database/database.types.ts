@@ -6,6 +6,8 @@ export interface UsersTable {
   name: string;
   picture: string;
   role: string;
+  refresh_token_hash?: string | null;
+  refresh_token_expires_at?: Date | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
