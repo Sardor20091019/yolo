@@ -73,7 +73,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   private requestCounter: number = 0;
   private activeConfig: StreamConfigDto = {
     mode: 'WEBCAM',
-    confidenceThreshold: 0.35,
+    confidenceThreshold: 0.2,
     suspicionThreshold: 75,
     loiteringThresholdSeconds: 10,
     nervousCheckSensitivity: 3,

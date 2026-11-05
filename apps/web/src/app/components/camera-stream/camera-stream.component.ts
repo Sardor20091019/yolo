@@ -80,7 +80,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           }));
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
-        } else if (Date.now() - this.lastBackendTimestamp > 1200) {
+        } else {
           this.currentDetections = [];
           this.currentPoses = [];
           this.currentDetectionsCount.set(0);
@@ -323,10 +323,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const now = Date.now();
-            const isFresh = now - this.lastBackendTimestamp < 1800;
-            const posesToRender = isFresh ? this.currentPoses : [];
-            const boxesToRender = isFresh ? this.currentDetections : [];
+            const posesToRender = this.currentPoses;
+            const boxesToRender = this.currentDetections;
 
             const scaleX = canvas.width / (this.sentFrameWidth || canvas.width);
             const scaleY = canvas.height / (this.sentFrameHeight || canvas.height);
@@ -360,7 +358,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           if (i1 < kps.length && i2 < kps.length) {
             const kp1 = kps[i1];
             const kp2 = kps[i2];
-            if (kp1 && kp2 && kp1.confidence >= 0.3 && kp2.confidence >= 0.3 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
+            if (kp1 && kp2 && kp1.confidence >= 0.2 && kp2.confidence >= 0.2 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
               ctx.beginPath();
               ctx.moveTo(kp1.x * scaleX, kp1.y * scaleY);
               ctx.lineTo(kp2.x * scaleX, kp2.y * scaleY);
@@ -371,7 +369,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       kps.forEach((kp) => {
-        if (kp.confidence >= 0.3 && kp.x > 0 && kp.y > 0) {
+        if (kp.confidence >= 0.2 && kp.x > 0 && kp.y > 0) {
           const sx = kp.x * scaleX;
           const sy = kp.y * scaleY;
 

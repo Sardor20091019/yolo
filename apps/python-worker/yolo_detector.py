@@ -233,7 +233,7 @@ class YoloShopliftingDetector:
         zones: List[Dict[str, Any]],
         calibration: Dict[str, Any]
     ) -> Dict[str, Any]:
-        conf_thresh = float(calibration.get('confidenceThreshold', 0.35))
+        conf_thresh = max(0.18, min(float(calibration.get('confidenceThreshold', 0.25)), 0.35))
 
         if self.has_ultralytics:
             image = self.decode_frame(frame_data)
@@ -269,8 +269,6 @@ class YoloShopliftingDetector:
     ) -> Dict[str, Any]:
         boxes_out: List[Dict[str, Any]] = []
         poses_out: List[Dict[str, Any]] = []
-        suspicion_out: List[Dict[str, Any]] = []
-        detected_items: List[Dict[str, Any]] = []
 
         future_det = self.executor.submit(self.predict_detection, image, conf_thresh)
         future_pose = self.executor.submit(self.predict_pose, image, conf_thresh)
@@ -305,10 +303,22 @@ class YoloShopliftingDetector:
 
             for i in range(len(p_boxes)):
                 p_track_id = int(p_boxes.id[i].item()) if getattr(p_boxes, 'id', None) is not None and p_boxes.id[i] is not None else (i + 1)
+                p_xyxy = p_boxes.xyxy[i].cpu().numpy().tolist()
+                p_conf = float(p_boxes.conf[i].item())
+
+                has_person = any(b.get('label') == 'person' and abs(b['bbox'][0] - p_xyxy[0]) < 50 for b in boxes_out)
+                if not has_person:
+                    boxes_out.insert(0, {
+                        'trackId': p_track_id,
+                        'label': 'person',
+                        'confidence': round(p_conf, 2),
+                        'bbox': [round(x, 1) for x in p_xyxy]
+                    })
+
                 kp_data = p_keypoints.data[i].cpu().numpy()
 
                 formatted_kps = []
-                face_kps = []
+                face_pts = []
                 for k_idx in range(min(len(kp_data), len(KEYPOINT_NAMES))):
                     kx, ky, kc = float(kp_data[k_idx][0]), float(kp_data[k_idx][1]), float(kp_data[k_idx][2])
                     formatted_kps.append({
@@ -317,8 +327,8 @@ class YoloShopliftingDetector:
                         'confidence': round(kc, 2),
                         'name': KEYPOINT_NAMES[k_idx]
                     })
-                    if k_idx in [0, 1, 2, 3, 4] and kc >= 0.35 and kx > 0 and ky > 0:
-                        face_kps.append((kx, ky))
+                    if k_idx in [0, 1, 2, 3, 4] and kc >= 0.15 and kx > 0 and ky > 0:
+                        face_pts.append((kx, ky))
 
                 poses_out.append({
                     'trackId': p_track_id,
@@ -326,21 +336,38 @@ class YoloShopliftingDetector:
                     'skeleton': SKELETON_PAIRS
                 })
 
-                if len(face_kps) >= 2:
-                    fxs = [p[0] for p in face_kps]
-                    fys = [p[1] for p in face_kps]
-                    f_minx = min(fxs)
-                    f_maxx = max(fxs)
-                    f_miny = min(fys)
-                    f_maxy = max(fys)
-                    fw = f_maxx - f_minx
-                    fh = f_maxy - f_miny
-                    pad = max(15, max(fw, fh) * 0.4)
+                face_box = None
+                if len(face_pts) >= 2:
+                    xs = [pt[0] for pt in face_pts]
+                    ys = [pt[1] for pt in face_pts]
+                    fx1, fx2 = min(xs), max(xs)
+                    fy1, fy2 = min(ys), max(ys)
+                    fw = fx2 - fx1
+                    fh = fy2 - fy1
+                    pad = max(24.0, max(fw, fh) * 0.5)
+                    face_box = [max(0.0, fx1 - pad), max(0.0, fy1 - pad), fx2 + pad, fy2 + pad]
+                elif len(face_pts) == 1:
+                    cx, cy = face_pts[0]
+                    rad = 38.0
+                    face_box = [max(0.0, cx - rad), max(0.0, cy - rad), cx + rad, cy + rad]
+                elif len(formatted_kps) > 6:
+                    ls = formatted_kps[5]
+                    rs = formatted_kps[6]
+                    if ls['confidence'] >= 0.25 and rs['confidence'] >= 0.25 and ls['x'] > 0 and rs['x'] > 0:
+                        head_cx = (ls['x'] + rs['x']) / 2.0
+                        shoulder_w = abs(ls['x'] - rs['x'])
+                        head_h = max(35.0, shoulder_w * 0.75)
+                        head_cy = min(ls['y'], rs['y']) - (head_h * 0.55)
+                        if head_cy > 0:
+                            rad = head_h * 0.5
+                            face_box = [max(0.0, head_cx - rad), max(0.0, head_cy - rad), head_cx + rad, head_cy + rad]
+
+                if face_box:
                     boxes_out.append({
                         'trackId': p_track_id,
                         'label': 'face',
                         'confidence': 0.95,
-                        'bbox': [round(max(0, f_minx - pad), 1), round(max(0, f_miny - pad), 1), round(f_maxx + pad, 1), round(f_maxy + pad, 1)]
+                        'bbox': [round(v, 1) for v in face_box]
                     })
 
         return {

@@ -31,6 +31,7 @@ interface StreamFramePayload {
   cors: {
     origin: '*',
   },
+  maxHttpBufferSize: 1e8,
 })
 export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
