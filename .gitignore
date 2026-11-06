@@ -10,7 +10,12 @@ snapshots/
 .angular/
 .cache/
 .DS_Store
+# Ignore large model checkpoints, but allow lightweight deployment models
 *.pt
+!yolo11n.pt
+!yolo11n-pose.pt
+!apps/python-worker/yolo11n.pt
+!apps/python-worker/yolo11n-pose.pt
 runs/
 *.mp4
 pose-estimation-*.py

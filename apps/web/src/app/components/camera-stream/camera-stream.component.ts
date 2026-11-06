@@ -87,7 +87,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           this.currentSuspicion = suspicion;
           this.currentDetectionsCount.set(boxes.length);
           this.lastDetectionReceivedAt = Date.now();
-        } else if (Date.now() - this.lastDetectionReceivedAt > 700) {
+        } else if (Date.now() - this.lastDetectionReceivedAt > 3500) {
           this.currentDetections = [];
           this.currentPoses = [];
           this.currentSuspicion = [];
@@ -101,7 +101,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           }));
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
-        } else if (Date.now() - this.lastDetectionReceivedAt > 700) {
+        } else if (Date.now() - this.lastDetectionReceivedAt > 3500) {
           this.detectedObjectChips.set([]);
         }
 
@@ -355,7 +355,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       clearInterval(this.captureIntervalId);
     }
 
-    const intervalMs = 120;
+    const intervalMs = 60;
     this.captureIntervalId = setInterval(() => {
       this.captureAndProcessFrame();
     }, intervalMs);
@@ -367,7 +367,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     const now = Date.now();
-    if (this.isProcessingFrame && now - this.lastSendTimestamp < 160) {
+    if (this.isProcessingFrame && now - this.lastSendTimestamp < 3500) {
       return;
     }
 

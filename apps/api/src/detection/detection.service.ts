@@ -223,8 +223,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     const configuredScript = this.configService.get<string>('python.workerPath', 'apps/python-worker/main.py');
     const workerScript = this.resolveWorkerScriptPath(configuredScript);
     const workerDir = path.dirname(workerScript);
-    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo26m.pt');
-    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo26m-pose.pt');
+    const detectionModel = this.configService.get<string>('yolo.detectionModel', 'yolo11n.pt');
+    const poseModel = this.configService.get<string>('yolo.poseModel', 'yolo11n-pose.pt');
 
     try {
       this.pythonProcess = spawn(pythonBin, [
@@ -416,7 +416,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    const fallback = this.createFallbackResult(frameIndex);
+    const fallback = this.createFallbackResult(frameIndex, stationId);
     this.registerOrUpdateStation(
       stationId || 'CCTV-MAIN',
       stationName,
@@ -453,10 +453,10 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     const timeout = setTimeout(() => {
       if (this.pendingRequests.has(task.requestId)) {
         this.pendingRequests.delete(task.requestId);
-        task.resolve(this.createFallbackResult(task.frameIndex));
+        task.resolve(this.createFallbackResult(task.frameIndex, task.stationId));
         this.scheduleNextTaskOrIdle();
       }
-    }, 8000);
+    }, 12000);
 
     this.pendingRequests.set(task.requestId, (res: FrameProcessingResult) => {
       clearTimeout(timeout);
@@ -578,7 +578,17 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private createFallbackResult(frameIndex: number): FrameProcessingResult {
+  private createFallbackResult(frameIndex: number, stationId?: string): FrameProcessingResult {
+    if (stationId) {
+      const cached = this.latestKnownResult.get(stationId);
+      if (cached && (cached.boxes.length > 0 || cached.poses.length > 0)) {
+        return {
+          ...cached,
+          frameIndex,
+          timestamp: Date.now(),
+        };
+      }
+    }
     const isWorkerAlive = this.pythonProcess !== null && !this.pythonProcess.killed;
     return {
       frameIndex,
@@ -587,7 +597,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       poses: [],
       suspicion: [],
       alertTriggered: false,
-      isYoloActive: false,
+      isYoloActive: isWorkerAlive,
       engineError: isWorkerAlive
         ? 'YOLO worker timed out processing frame'
         : 'YOLO Python worker process is offline or disconnected',

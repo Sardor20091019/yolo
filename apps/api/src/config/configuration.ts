@@ -19,10 +19,10 @@ export default (): AppConfig => ({
     workerUrl: process.env.PYTHON_WORKER_URL || '',
   },
   yolo: {
-    detectionModel: process.env.YOLO_DETECTION_MODEL || 'yolo26m.pt',
-    detectionFallbackModel: process.env.YOLO_DETECTION_FALLBACK_MODEL || 'yolo26m.pt',
-    poseModel: process.env.YOLO_POSE_MODEL || 'yolo26m-pose.pt',
-    poseFallbackModel: process.env.YOLO_POSE_FALLBACK_MODEL || 'yolo26m-pose.pt',
+    detectionModel: process.env.YOLO_DETECTION_MODEL || 'yolo11n.pt',
+    detectionFallbackModel: process.env.YOLO_DETECTION_FALLBACK_MODEL || 'yolo11n.pt',
+    poseModel: process.env.YOLO_POSE_MODEL || 'yolo11n-pose.pt',
+    poseFallbackModel: process.env.YOLO_POSE_FALLBACK_MODEL || 'yolo11n-pose.pt',
   },
   thresholds: {
     defaultConfidence: parseFloat(process.env.DEFAULT_CONFIDENCE_THRESHOLD || '0.35'),

@@ -22,12 +22,13 @@ def run_ipc_loop(detector: YoloShopliftingDetector) -> None:
             zones = req.get('zones', [])
             calibration = req.get('calibration', {})
 
+            return_annotated = req.get('returnAnnotated', False)
             result = detector.process_frame(
                 frame_data=frame_data,
                 frame_index=frame_index,
                 zones=zones,
                 calibration=calibration,
-                return_annotated=True
+                return_annotated=return_annotated
             )
 
             response = {
@@ -63,12 +64,13 @@ async def handle_ws_client(websocket, detector: YoloShopliftingDetector) -> None
             zones = req.get('zones', [])
             calibration = req.get('calibration', {})
 
+            return_annotated = req.get('returnAnnotated', False)
             result = detector.process_frame(
                 frame_data=frame_data,
                 frame_index=frame_index,
                 zones=zones,
                 calibration=calibration,
-                return_annotated=True
+                return_annotated=return_annotated
             )
 
             response = {

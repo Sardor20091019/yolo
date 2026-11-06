@@ -108,6 +108,10 @@ class YoloShopliftingDetector:
                 self.device = 'cuda'
             else:
                 self.device = 'cpu'
+                try:
+                    torch.set_num_threads(2)
+                except Exception:
+                    pass
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
             repo_dir = os.path.dirname(base_dir)
@@ -128,16 +132,41 @@ class YoloShopliftingDetector:
                         return p
                 return name
 
-            det_candidates = [
-                resolve_model_file(det_path),
-                resolve_model_file(det_fallback),
-                resolve_model_file('yolo26m.pt'),
-                resolve_model_file('yolo26n.pt'),
-                resolve_model_file('yolo11m.pt'),
-                resolve_model_file('yolo11n.pt'),
-                'yolo26m.pt',
-                'yolo11m.pt'
-            ]
+            if self.device == 'cpu':
+                det_candidates = [
+                    resolve_model_file('yolo11n.pt'),
+                    resolve_model_file('yolo26n.pt'),
+                    resolve_model_file(det_path),
+                    resolve_model_file(det_fallback),
+                    resolve_model_file('yolo11m.pt'),
+                    resolve_model_file('yolo26m.pt'),
+                    'yolo11n.pt'
+                ]
+                pose_candidates = [
+                    resolve_model_file('yolo11n-pose.pt'),
+                    resolve_model_file('yolo26n-pose.pt'),
+                    resolve_model_file(pose_path),
+                    resolve_model_file(pose_fallback),
+                    resolve_model_file('yolo11m-pose.pt'),
+                    resolve_model_file('yolo26m-pose.pt'),
+                    'yolo11n-pose.pt'
+                ]
+            else:
+                det_candidates = [
+                    resolve_model_file(det_path),
+                    resolve_model_file(det_fallback),
+                    resolve_model_file('yolo11n.pt'),
+                    resolve_model_file('yolo26m.pt'),
+                    'yolo11n.pt'
+                ]
+                pose_candidates = [
+                    resolve_model_file(pose_path),
+                    resolve_model_file(pose_fallback),
+                    resolve_model_file('yolo11n-pose.pt'),
+                    resolve_model_file('yolo26m-pose.pt'),
+                    'yolo11n-pose.pt'
+                ]
+
             for candidate in det_candidates:
                 try:
                     self.detection_model = YOLO(candidate)
@@ -145,16 +174,6 @@ class YoloShopliftingDetector:
                 except Exception:
                     continue
 
-            pose_candidates = [
-                resolve_model_file(pose_path),
-                resolve_model_file(pose_fallback),
-                resolve_model_file('yolo26m-pose.pt'),
-                resolve_model_file('yolo26n-pose.pt'),
-                resolve_model_file('yolo11m-pose.pt'),
-                resolve_model_file('yolo11n-pose.pt'),
-                'yolo26m-pose.pt',
-                'yolo11m-pose.pt'
-            ]
             for candidate in pose_candidates:
                 try:
                     self.pose_model = YOLO(candidate)
@@ -166,8 +185,10 @@ class YoloShopliftingDetector:
                 self.has_ultralytics = True
                 try:
                     dummy = np.zeros((360, 640, 3), dtype=np.uint8)
-                    self.detection_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=480)
-                    self.pose_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=480)
+                    warmup_sz = 384 if self.device == 'cpu' else 480
+                    with torch.inference_mode():
+                        self.detection_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=warmup_sz)
+                        self.pose_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=warmup_sz)
                 except Exception:
                     pass
         except ImportError:
@@ -194,26 +215,30 @@ class YoloShopliftingDetector:
     def predict_detection(self, image: Any, conf_thresh: float) -> List[Any]:
         if not self.detection_model:
             return []
+        import torch
+        target_sz = 384 if self.device == 'cpu' else 480
         try:
-            return self.detection_model.predict(
-                source=image,
-                conf=conf_thresh,
-                verbose=False,
-                device=self.device,
-                imgsz=480
-            )
+            with torch.inference_mode():
+                return self.detection_model.predict(
+                    source=image,
+                    conf=conf_thresh,
+                    verbose=False,
+                    device=self.device,
+                    imgsz=target_sz
+                )
         except Exception as exc:
             sys.stderr.write(f"Detection prediction on {self.device} failed: {exc}\n")
             if self.device != 'cpu':
                 try:
                     self.device = 'cpu'
-                    return self.detection_model.predict(
-                        source=image,
-                        conf=conf_thresh,
-                        verbose=False,
-                        device='cpu',
-                        imgsz=480
-                    )
+                    with torch.inference_mode():
+                        return self.detection_model.predict(
+                            source=image,
+                            conf=conf_thresh,
+                            verbose=False,
+                            device='cpu',
+                            imgsz=384
+                        )
                 except Exception as exc2:
                     sys.stderr.write(f"Detection fallback to cpu failed: {exc2}\n")
             return []
@@ -221,26 +246,30 @@ class YoloShopliftingDetector:
     def predict_pose(self, image: Any, conf_thresh: float) -> List[Any]:
         if not self.pose_model:
             return []
+        import torch
+        target_sz = 384 if self.device == 'cpu' else 480
         try:
-            return self.pose_model.predict(
-                source=image,
-                conf=conf_thresh,
-                verbose=False,
-                device=self.device,
-                imgsz=480
-            )
+            with torch.inference_mode():
+                return self.pose_model.predict(
+                    source=image,
+                    conf=conf_thresh,
+                    verbose=False,
+                    device=self.device,
+                    imgsz=target_sz
+                )
         except Exception as exc:
             sys.stderr.write(f"Pose prediction on {self.device} failed: {exc}\n")
             if self.device != 'cpu':
                 try:
                     self.device = 'cpu'
-                    return self.pose_model.predict(
-                        source=image,
-                        conf=conf_thresh,
-                        verbose=False,
-                        device='cpu',
-                        imgsz=480
-                    )
+                    with torch.inference_mode():
+                        return self.pose_model.predict(
+                            source=image,
+                            conf=conf_thresh,
+                            verbose=False,
+                            device='cpu',
+                            imgsz=384
+                        )
                 except Exception as exc2:
                     sys.stderr.write(f"Pose fallback to cpu failed: {exc2}\n")
             return []
