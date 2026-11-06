@@ -1,7 +1,7 @@
 <div class="min-h-screen bg-slate-50 dark:bg-[#0b0b09] text-slate-800 dark:text-[#d0cdc4] flex flex-col font-sans transition-colors duration-200">
 
   <header class="border-b hairline sticky top-0 z-40 bg-white/95 dark:bg-[#0b0b09]/95 backdrop-blur-md transition-colors duration-200">
-    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between">
 
       <div class="flex items-center space-x-6">
         <div class="flex items-center space-x-3">
@@ -12,14 +12,14 @@
           </div>
           <div>
             <div class="flex items-center space-x-2">
-              <span class="font-sans font-bold text-sm tracking-tight text-slate-900 dark:text-white">YOLO26 Vision</span>
-              <span class="tag tag-green rounded text-[0.6rem] py-0.5 px-1.5">LIVE</span>
+              <span class="font-sans font-bold text-sm tracking-tight text-slate-900 dark:text-white">Astro CCTV</span>
+              <span class="tag tag-green rounded text-[0.6rem] py-0.5 px-1.5 font-mono">LIVE THEFT AI</span>
             </div>
-            <div class="label" style="font-size:0.58rem">Object, Pose &amp; Face Detection</div>
+            <div class="label text-[0.58rem]">YOLO26 &bull; WebRTC Surveillance Multiplex</div>
           </div>
         </div>
 
-        <nav class="hidden sm:flex items-center space-x-1">
+        <nav class="hidden md:flex items-center space-x-1">
           <button
             type="button"
             (click)="setActiveTab('feed')"
@@ -27,7 +27,19 @@
             [style.border-bottom]="activeTab() === 'feed' ? '2px solid #10b981' : '2px solid transparent'"
             class="px-3.5 py-2 text-xs font-mono tracking-wider uppercase transition-colors"
             style="background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.7rem">
-            Live Detection
+            📹 Camera Node
+          </button>
+          <button
+            type="button"
+            (click)="setActiveTab('cctv')"
+            [style.color]="activeTab() === 'cctv' ? (themeService.isDark() ? '#ffffff' : '#0f172a') : (themeService.isDark() ? '#8c8880' : '#64748b')"
+            [style.border-bottom]="activeTab() === 'cctv' ? '2px solid #10b981' : '2px solid transparent'"
+            class="px-3.5 py-2 text-xs font-mono tracking-wider uppercase transition-colors flex items-center space-x-1.5"
+            style="background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.7rem">
+            <span>🛡️ Admin CCTV Matrix</span>
+            <span *ngIf="wsService.cctvStations().length > 0" class="tag tag-green rounded text-[0.58rem] px-1">
+              {{ wsService.cctvStations().length }}
+            </span>
           </button>
           <button
             type="button"
@@ -36,13 +48,26 @@
             [style.border-bottom]="activeTab() === 'logs' ? '2px solid #10b981' : '2px solid transparent'"
             class="px-3.5 py-2 text-xs font-mono tracking-wider uppercase transition-colors"
             style="background:transparent; border-top:0; border-left:0; border-right:0; cursor:pointer; font-size:0.7rem">
-            Detection History
+            Detection Logs
             <span *ngIf="logService.logs().length > 0" class="ml-1.5 tag rounded text-[0.6rem]">{{ logService.logs().length }}</span>
           </button>
         </nav>
       </div>
 
       <div class="flex items-center space-x-2.5">
+        <button
+          type="button"
+          (click)="toggleRole()"
+          class="flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-mono border hairline transition-all cursor-pointer"
+          [ngClass]="authService.isAdmin() ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' : 'bg-slate-100 dark:bg-[#141412] text-slate-700 dark:text-[#8c8880] border-slate-300 dark:border-white/10'"
+          title="Click to switch between User (Camera Node) and Admin (All Cameras)">
+          <span class="status-dot" [style.background]="authService.isAdmin() ? '#f59e0b' : '#10b981'"></span>
+          <span class="font-bold text-[0.65rem] uppercase">
+            {{ authService.isAdmin() ? 'ADMIN' : 'USER' }}
+          </span>
+          <span class="text-[0.6rem] opacity-75 hidden sm:inline">(Switch)</span>
+        </button>
+
         <button
           type="button"
           (click)="themeService.toggleTheme()"
@@ -57,9 +82,14 @@
         </button>
 
         <div class="hidden md:flex items-center space-x-2 border hairline px-2.5 py-1 rounded bg-slate-100 dark:bg-[#111110]">
-          <span class="status-dot" [style.background]="wsService.isConnected() ? '#10b981' : '#ef4444'"></span>
-          <span class="font-mono text-xs" [style.color]="wsService.isConnected() ? '#10b981' : '#ef4444'" style="font-size:0.65rem">
-            {{ wsService.isConnected() ? 'YOLO Connected' : 'Offline' }}
+          <span
+            class="status-dot"
+            [style.background]="wsService.isConnected() && wsService.isYoloActive() ? '#10b981' : '#ef4444'"></span>
+          <span
+            class="font-mono text-xs"
+            [style.color]="wsService.isConnected() && wsService.isYoloActive() ? '#10b981' : '#ef4444'"
+            style="font-size:0.65rem">
+            {{ !wsService.isConnected() ? 'Offline' : (wsService.isYoloActive() ? 'YOLO Online' : 'YOLO Degraded') }}
           </span>
         </div>
 
@@ -67,83 +97,45 @@
           <button
             type="button"
             (click)="toggleAccountMenu()"
-            class="flex items-center space-x-2.5 border hairline px-3 py-1.5 transition-colors cursor-pointer rounded bg-slate-100 dark:bg-[#111110]"
-            [style.border-color]="isAccountMenuOpen() ? '#10b981' : ''">
-            <img *ngIf="user.picture" [src]="user.picture" alt="User" class="w-5 h-5 rounded-full object-cover border hairline"/>
-            <div *ngIf="!user.picture" class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono bg-slate-200 dark:bg-[#171715] text-emerald-600 dark:text-[#10b981]">
+            class="flex items-center space-x-2 border hairline px-2.5 py-1.5 transition-colors cursor-pointer rounded bg-slate-100 dark:bg-[#111110]">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[0.65rem] font-mono bg-slate-200 dark:bg-[#171715] text-emerald-600 dark:text-[#10b981]">
               {{ user.name.slice(0, 1).toUpperCase() }}
             </div>
-            <div class="hidden sm:flex flex-col text-left">
-              <span class="text-xs font-sans font-medium truncate max-w-[120px] text-slate-900 dark:text-[#d0cdc4]">{{ user.name }}</span>
-            </div>
-            <svg class="w-3 h-3 transition-transform text-slate-500 dark:text-[#8c8880]" [style.transform]="isAccountMenuOpen() ? 'rotate(180deg)' : 'rotate(0deg)'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-            </svg>
+            <span class="text-xs font-sans font-medium truncate max-w-[100px] text-slate-900 dark:text-[#d0cdc4]">{{ user.name }}</span>
           </button>
-
-          <div
-            *ngIf="isAccountMenuOpen()"
-            class="absolute right-0 mt-2 w-64 border hairline shadow-2xl z-50 overflow-hidden rounded bg-white dark:bg-[#111110]">
-            <div class="p-4 border-b hairline bg-slate-50 dark:bg-[#141412]">
-              <div class="flex items-center space-x-3 mb-1">
-                <img *ngIf="user.picture" [src]="user.picture" alt="User" class="w-8 h-8 rounded-full object-cover border hairline"/>
-                <div *ngIf="!user.picture" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono bg-slate-200 dark:bg-[#1c1c19] text-emerald-600 dark:text-[#10b981]">
-                  {{ user.name.slice(0, 1).toUpperCase() }}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="font-sans font-medium text-xs truncate text-slate-900 dark:text-white">{{ user.name }}</div>
-                  <div class="font-mono text-xs truncate text-slate-500 dark:text-[#8c8880] text-[0.65rem]">{{ user.email }}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="p-3">
-              <button
-                type="button"
-                (click)="signOut()"
-                class="btn-danger w-full flex items-center justify-center space-x-2 rounded py-2 px-4">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                </svg>
-                <span>SIGN OUT</span>
-              </button>
-            </div>
-          </div>
         </div>
-
-        <button
-          *ngIf="!authService.currentUser()"
-          type="button"
-          (click)="openSignInModal()"
-          class="btn-primary flex items-center space-x-2 rounded text-xs">
-          <span>SIGN IN</span>
-        </button>
       </div>
 
     </div>
 
-    <div class="sm:hidden border-t hairline px-3 py-1.5 flex justify-around bg-slate-50 dark:bg-[#0e0e0c]">
+    <div class="md:hidden border-t hairline px-3 py-1.5 flex justify-around bg-slate-50 dark:bg-[#0e0e0c]">
       <button
         type="button"
         (click)="setActiveTab('feed')"
         [style.color]="activeTab() === 'feed' ? '#10b981' : (themeService.isDark() ? '#8c8880' : '#64748b')"
         class="py-1 text-xs font-mono uppercase tracking-wider transition-colors"
-        style="background:transparent; border:none; cursor:pointer">Live Detection</button>
+        style="background:transparent; border:none; cursor:pointer">Camera Node</button>
+      <button
+        type="button"
+        (click)="setActiveTab('cctv')"
+        [style.color]="activeTab() === 'cctv' ? '#10b981' : (themeService.isDark() ? '#8c8880' : '#64748b')"
+        class="py-1 text-xs font-mono uppercase tracking-wider transition-colors"
+        style="background:transparent; border:none; cursor:pointer">Admin Matrix</button>
       <button
         type="button"
         (click)="setActiveTab('logs')"
         [style.color]="activeTab() === 'logs' ? '#10b981' : (themeService.isDark() ? '#8c8880' : '#64748b')"
         class="py-1 text-xs font-mono uppercase tracking-wider transition-colors"
-        style="background:transparent; border:none; cursor:pointer">History ({{ logService.logs().length }})</button>
+        style="background:transparent; border:none; cursor:pointer">Logs</button>
     </div>
   </header>
 
-  <main class="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-6" (click)="closeAccountMenu()">
+  <main class="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-5" (click)="closeAccountMenu()">
 
     <div *ngIf="activeTab() === 'feed'">
-      <div class="hidden lg:grid lg:grid-cols-12 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div class="lg:col-span-8 flex flex-col space-y-5">
-          <div style="height:540px">
+          <div style="min-height:520px; height:560px">
             <app-camera-stream></app-camera-stream>
           </div>
         </div>
@@ -151,13 +143,10 @@
           <app-detection-log></app-detection-log>
         </div>
       </div>
+    </div>
 
-      <div class="lg:hidden flex flex-col space-y-5">
-        <div style="height:480px">
-          <app-camera-stream></app-camera-stream>
-        </div>
-        <app-detection-log></app-detection-log>
-      </div>
+    <div *ngIf="activeTab() === 'cctv'">
+      <app-admin-cctv></app-admin-cctv>
     </div>
 
     <div *ngIf="activeTab() === 'logs'">
@@ -166,47 +155,14 @@
 
   </main>
 
-  <footer class="border-t hairline px-4 sm:px-6 py-3.5 mt-auto bg-white dark:bg-[#0e0e0c] transition-colors duration-200">
+  <footer class="border-t hairline px-4 sm:px-6 py-3 mt-auto bg-white dark:bg-[#0e0e0c] transition-colors duration-200">
     <div class="max-w-screen-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
       <div class="flex items-center space-x-3">
         <span class="status-dot animate-live" style="background:#10b981"></span>
-        <span class="label text-[0.65rem]">YOLO26 Vision &bull; Dual-Model Pipeline (yolo26m.pt + yolo26m-pose.pt)</span>
+        <span class="label text-[0.65rem]">Astro CCTV &bull; YOLO26 + MediaPipe Tasks + WebRTC P2P</span>
       </div>
-      <div class="label text-[0.65rem] text-slate-500 dark:text-[#8c8880]">Real-Time Object &amp; Pose Detection</div>
+      <div class="label text-[0.65rem] text-slate-500 dark:text-[#8c8880]">Real-Time Anti-Shoplifting &bull; Multi-Camera Surveillance</div>
     </div>
   </footer>
-
-  <div *ngIf="authService.isAuthModalOpen()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
-    <div class="border hairline max-w-sm w-full flex flex-col shadow-2xl rounded bg-white dark:bg-[#111110] text-slate-900 dark:text-white">
-
-      <div class="flex items-center justify-between px-5 py-4 border-b hairline bg-slate-50 dark:bg-[#141412]">
-        <div>
-          <div class="font-sans text-sm font-semibold text-slate-900 dark:text-white">Sign In</div>
-          <div class="label mt-0.5 text-[0.65rem]">Access your profile and detection logs</div>
-        </div>
-        <button type="button" (click)="authService.closeAuthModal()" class="btn-ghost rounded p-1 text-sm">&times;</button>
-      </div>
-
-      <div *ngIf="authService.authErrorMessage()" class="px-5 py-2.5 border-b hairline bg-red-500/10 text-red-600 dark:text-red-400">
-        <span class="font-mono text-xs">{{ authService.authErrorMessage() }}</span>
-      </div>
-
-      <div class="p-5 flex flex-col space-y-4">
-        <button
-          type="button"
-          (click)="loginViaGoogle()"
-          class="btn-ghost w-full flex items-center justify-center space-x-2 border hairline rounded py-2.5 px-4 bg-white dark:bg-[#141412] hover:bg-slate-50 dark:hover:bg-[#171715]">
-          <svg class="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <span class="text-slate-900 dark:text-white text-xs font-medium">Sign in with Google</span>
-        </button>
-      </div>
-
-    </div>
-  </div>
 
 </div>

@@ -62,6 +62,9 @@ export interface FrameProcessingResult {
   suspicion: SuspicionBreakdown[];
   alertTriggered: boolean;
   annotatedFrame?: string;
+  isYoloActive?: boolean;
+  engineError?: string;
+  stationId?: string;
 }
 
 @Injectable()
@@ -327,7 +330,12 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
 
         if (response.ok) {
           const workerResult = (await response.json()) as FrameProcessingResult;
-          this.registerOrUpdateStation(
+          workerResult.stationId = stationId || 'CCTV-MAIN';
+          if (workerResult.isYoloActive === undefined) {
+            workerResult.isYoloActive = true;
+          }
+
+      this.registerOrUpdateStation(
             stationId || 'CCTV-MAIN',
             stationName,
             frameData,
@@ -359,6 +367,11 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
 
         this.pythonProcess?.stdin.write(JSON.stringify(payload) + '\n');
       });
+
+      result.stationId = stationId || 'CCTV-MAIN';
+      if (result.isYoloActive === undefined) {
+        result.isYoloActive = true;
+      }
 
       this.registerOrUpdateStation(
         stationId || 'CCTV-MAIN',
@@ -470,6 +483,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private createFallbackResult(frameIndex: number): FrameProcessingResult {
+    const isWorkerAlive = this.pythonProcess !== null && !this.pythonProcess.killed;
     return {
       frameIndex,
       timestamp: Date.now(),
@@ -477,6 +491,10 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       poses: [],
       suspicion: [],
       alertTriggered: false,
+      isYoloActive: false,
+      engineError: isWorkerAlive
+        ? 'YOLO worker timed out processing frame'
+        : 'YOLO Python worker process is offline or disconnected',
     };
   }
 

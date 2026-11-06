@@ -12,9 +12,10 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WebSocketService } from '../../services/websocket.service';
+import { WebrtcService } from '../../services/webrtc.service';
 import { DetectionApiService } from '../../services/detection.service';
 import { DetectionLogService } from '../../services/detection-log.service';
-import { BoundingBox, PoseSkeleton } from '../../models/detection.model';
+import { BoundingBox, PoseSkeleton, SuspicionBreakdown } from '../../models/detection.model';
 
 @Component({
   selector: 'app-camera-stream',
@@ -36,8 +37,15 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   public readonly detectedObjectChips: WritableSignal<{ label: string; confidence: number }[]> = signal([]);
   public readonly latencyMs: WritableSignal<number> = signal<number>(16);
 
+  public readonly stationId: WritableSignal<string> = signal<string>('');
+  public readonly stationName: WritableSignal<string> = signal<string>('Phone CCTV Station');
+  public readonly isEditingStationName: WritableSignal<boolean> = signal<boolean>(false);
+  public readonly activeTheftAlerts: WritableSignal<string[]> = signal<string[]>([]);
+  public readonly highestSuspicionScore: WritableSignal<number> = signal<number>(0);
+
   public currentDetections: BoundingBox[] = [];
   public currentPoses: PoseSkeleton[] = [];
+  public currentSuspicion: SuspicionBreakdown[] = [];
 
   private mediaStream: MediaStream | null = null;
   private captureIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -53,6 +61,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
   constructor(
     public readonly wsService: WebSocketService,
+    public readonly webrtcService: WebrtcService,
     public readonly detectionApi: DetectionApiService,
     public readonly logService: DetectionLogService,
   ) {
@@ -68,12 +77,14 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
         const boxes = result.boxes || [];
         const poses = result.poses || [];
+        const suspicion = result.suspicion || [];
 
-        if (boxes.length > 0 || poses.length > 0) {
-          this.currentDetections = boxes;
-          this.currentPoses = poses;
-          this.currentDetectionsCount.set(boxes.length);
+        this.currentDetections = boxes;
+        this.currentPoses = poses;
+        this.currentSuspicion = suspicion;
+        this.currentDetectionsCount.set(boxes.length);
 
+        if (boxes.length > 0) {
           const chips = boxes.map((d) => ({
             label: d.label,
             confidence: Math.round(d.confidence * 100),
@@ -81,16 +92,27 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
         } else {
-          this.currentDetections = [];
-          this.currentPoses = [];
-          this.currentDetectionsCount.set(0);
           this.detectedObjectChips.set([]);
         }
+
+        const alerts: string[] = [];
+        let maxScore = 0;
+        suspicion.forEach((s) => {
+          if (s.score > maxScore) {
+            maxScore = s.score;
+          }
+          if (s.triggers && s.triggers.length > 0) {
+            s.triggers.forEach((t) => alerts.push(`Person #${s.trackId}: ${t}`));
+          }
+        });
+        this.highestSuspicionScore.set(maxScore);
+        this.activeTheftAlerts.set(alerts);
       }
     });
   }
 
   public ngOnInit(): void {
+    this.initStationIdentity();
     this.startRenderLoop();
   }
 
@@ -99,6 +121,46 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     if (this.renderAnimationId !== null) {
       cancelAnimationFrame(this.renderAnimationId);
     }
+  }
+
+  private initStationIdentity(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      this.stationId.set('cctv-phone-node');
+      return;
+    }
+
+    const storedId = localStorage.getItem('cctv_station_id');
+    const storedName = localStorage.getItem('cctv_station_name');
+
+    if (storedId) {
+      this.stationId.set(storedId);
+    } else {
+      const newId = 'cctv-' + Math.random().toString(36).substring(2, 7);
+      this.stationId.set(newId);
+      localStorage.setItem('cctv_station_id', newId);
+    }
+
+    if (storedName) {
+      this.stationName.set(storedName);
+    } else {
+      const defaultName = `Mobile CCTV (${this.stationId()})`;
+      this.stationName.set(defaultName);
+      localStorage.setItem('cctv_station_name', defaultName);
+    }
+  }
+
+  public saveStationName(newName: string): void {
+    const trimmed = newName.trim();
+    if (trimmed) {
+      this.stationName.set(trimmed);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('cctv_station_name', trimmed);
+      }
+      if (this.isStreaming() && this.mediaStream) {
+        this.webrtcService.startBroadcasting(this.stationId(), trimmed, this.mediaStream);
+      }
+    }
+    this.isEditingStationName.set(false);
   }
 
   @HostListener('document:fullscreenchange')
@@ -159,6 +221,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       this.isStreaming.set(true);
+      this.webrtcService.startBroadcasting(this.stationId(), this.stationName(), this.mediaStream);
       this.startCaptureInterval();
     } catch (err: unknown) {
       console.error('Camera access failed:', err);
@@ -166,6 +229,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public stopStream(): void {
+    this.webrtcService.stopBroadcasting();
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = null;
@@ -179,8 +243,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
     this.currentDetections = [];
     this.currentPoses = [];
+    this.currentSuspicion = [];
     this.currentDetectionsCount.set(0);
     this.detectedObjectChips.set([]);
+    this.activeTheftAlerts.set([]);
+    this.highestSuspicionScore.set(0);
     this.isStreaming.set(false);
     this.isProcessingFrame = false;
   }
@@ -298,8 +365,8 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.frameCounter,
       'WEBCAM',
       this.currentDetections,
-      'YOLO26-CLIENT',
-      'Live Video Stream',
+      this.stationId(),
+      this.stationName(),
       this.logService.currentUser().id,
     );
   }
@@ -393,6 +460,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const suspicionMap = new Map<number, SuspicionBreakdown>();
+    this.currentSuspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+
     boxes.forEach((box) => {
       const rawBbox = box.bbox;
       const x1 = rawBbox[0] * scaleX;
@@ -405,16 +475,39 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       let strokeColor = '#10b981';
       let fillColor = 'rgba(16, 185, 129, 0.08)';
+      let labelText = `ID #${box.trackId} · ${box.label.toUpperCase()}`;
 
-      if (labelLower === 'face') {
+      if (labelLower === 'person') {
+        const susp = suspicionMap.get(box.trackId);
+        const score = susp ? susp.score : 0;
+        if (score >= 50 || (susp?.triggers && susp.triggers.length > 0)) {
+          strokeColor = '#ef4444';
+          fillColor = 'rgba(239, 68, 68, 0.18)';
+          labelText = `ALERT #${box.trackId} · SUSP: ${Math.round(score)}%`;
+        } else if (score >= 25) {
+          strokeColor = '#f59e0b';
+          fillColor = 'rgba(245, 158, 11, 0.12)';
+          labelText = `CAUTION #${box.trackId} · ${Math.round(score)}%`;
+        } else {
+          strokeColor = '#10b981';
+          fillColor = 'rgba(16, 185, 129, 0.08)';
+          labelText = `PERSON #${box.trackId} · SAFE`;
+        }
+
+        if (susp?.waistBbox) {
+          const [wx1, wy1, wx2, wy2] = susp.waistBbox;
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(wx1 * scaleX, wy1 * scaleY, (wx2 - wx1) * scaleX, (wy2 - wy1) * scaleY);
+        }
+      } else if (labelLower === 'face') {
         strokeColor = '#a855f7';
         fillColor = 'rgba(168, 85, 247, 0.12)';
-      } else if (labelLower === 'person') {
-        strokeColor = '#38bdf8';
-        fillColor = 'rgba(56, 189, 248, 0.08)';
-      } else if (labelLower === 'cell phone' || labelLower === 'phone') {
+        labelText = `FACE · ${Math.round((box.confidence || 0.95) * 100)}%`;
+      } else {
         strokeColor = '#f59e0b';
         fillColor = 'rgba(245, 158, 11, 0.1)';
+        labelText = `${box.label.toUpperCase()} · ${Math.round((box.confidence || 0.85) * 100)}%`;
       }
 
       ctx.strokeStyle = strokeColor;
@@ -423,9 +516,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
       ctx.fillStyle = fillColor;
       ctx.fillRect(x1, y1, w, h);
-
-      const confPct = Math.round((box.confidence || 0.85) * 100);
-      const labelText = `ID #${box.trackId} · ${box.label.toUpperCase()} · ${confPct}%`;
 
       ctx.font = '600 12px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);

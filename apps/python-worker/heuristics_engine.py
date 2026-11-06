@@ -3,8 +3,9 @@ import math
 from typing import Dict, List, Tuple, Any, Optional
 
 PORTABLE_ITEMS = {
-    'bottle', 'cell phone', 'book', 'cup', 'backpack', 'handbag',
-    'remote', 'clock', 'scissors', 'toothbrush', 'umbrella'
+    'bottle', 'cell phone', 'phone', 'book', 'cup', 'backpack', 'bag', 'handbag',
+    'remote', 'clock', 'scissors', 'toothbrush', 'umbrella', 'laptop', 'mouse',
+    'wallet', 'wine glass', 'glass'
 }
 
 class TrackState:
@@ -17,6 +18,14 @@ class TrackState:
         self.concealment_events: List[float] = []
         self.zone_dwell: Dict[str, float] = {}
         self.zone_entry_time: Dict[str, float] = {}
+
+    def reset(self) -> None:
+        self.wrist_in_waist_prev = {'left': False, 'right': False}
+        self.waist_entries.clear()
+        self.portable_item_interactions.clear()
+        self.concealment_events.clear()
+        self.zone_dwell.clear()
+        self.zone_entry_time.clear()
 
 class ShopliftingHeuristicsEngine:
     def __init__(self):
@@ -31,6 +40,9 @@ class ShopliftingHeuristicsEngine:
         state = self.tracks[track_id]
         state.last_seen = now
         return state
+
+    def clear_tracks(self) -> None:
+        self.tracks.clear()
 
     def cleanup_stale_tracks(self) -> None:
         now = time.time()
@@ -74,22 +86,22 @@ class ShopliftingHeuristicsEngine:
         right_hip = next((kp for kp in keypoints if kp.get('name') == 'right_hip'), None)
 
         px1, py1, px2, py2 = person_bbox
-        person_w = px2 - px1
-        person_h = py2 - py1
+        person_w = max(1.0, px2 - px1)
+        person_h = max(1.0, py2 - py1)
 
-        if left_hip and right_hip and left_hip.get('confidence', 0) > 0.3 and right_hip.get('confidence', 0) > 0.3:
+        if left_hip and right_hip and left_hip.get('confidence', 0) > 0.25 and right_hip.get('confidence', 0) > 0.25:
             lx, ly = left_hip['x'], left_hip['y']
             rx, ry = right_hip['x'], right_hip['y']
-            hx1 = min(lx, rx) - 0.25 * person_w
-            hx2 = max(lx, rx) + 0.25 * person_w
-            hy1 = min(ly, ry) - 0.15 * person_h
-            hy2 = max(ly, ry) + 0.30 * person_h
+            hx1 = max(px1, min(lx, rx) - 0.25 * person_w)
+            hx2 = min(px2, max(lx, rx) + 0.25 * person_w)
+            hy1 = max(py1, min(ly, ry) - 0.15 * person_h)
+            hy2 = min(py2, max(ly, ry) + 0.30 * person_h)
             return (hx1, hy1, hx2, hy2)
 
-        wy1 = py1 + 0.48 * person_h
-        wy2 = py1 + 0.75 * person_h
-        wx1 = px1 + 0.15 * person_w
-        wx2 = px2 - 0.15 * person_w
+        wy1 = py1 + 0.45 * person_h
+        wy2 = py1 + 0.72 * person_h
+        wx1 = px1 + 0.10 * person_w
+        wx2 = px2 - 0.10 * person_w
         return (wx1, wy1, wx2, wy2)
 
     def evaluate_person(
@@ -121,9 +133,9 @@ class ShopliftingHeuristicsEngine:
             item_radius = max((ix2 - ix1), (iy2 - iy1)) * 0.75
 
             for wrist in [left_wrist, right_wrist]:
-                if wrist and wrist.get('confidence', 0) > 0.35:
+                if wrist and wrist.get('confidence', 0) > 0.25:
                     d = self.distance((wrist['x'], wrist['y']), item_center)
-                    if d < max(65.0, item_radius):
+                    if d < max(70.0, item_radius):
                         state.portable_item_interactions.append((now, item_label))
 
         state.portable_item_interactions = [
@@ -132,7 +144,7 @@ class ShopliftingHeuristicsEngine:
 
         wrists = [('left', left_wrist), ('right', right_wrist)]
         for side, wrist in wrists:
-            if wrist and wrist.get('confidence', 0) > 0.35:
+            if wrist and wrist.get('confidence', 0) > 0.25:
                 in_waist = self.point_inside_bbox(wrist['x'], wrist['y'], waist_bbox)
                 prev_in_waist = state.wrist_in_waist_prev.get(side, False)
 
@@ -148,10 +160,10 @@ class ShopliftingHeuristicsEngine:
         state.concealment_events = [t for t in state.concealment_events if now - t <= 10.0]
 
         concealment_score = 0.0
-        triggers = []
+        triggers: List[str] = []
 
         if len(state.concealment_events) > 0:
-            concealment_score = 50.0
+            concealment_score = 55.0
             recent_item = state.portable_item_interactions[-1][1] if state.portable_item_interactions else 'item'
             triggers.append(f'Concealment motion into waist/pocket ({recent_item})')
 
@@ -197,7 +209,7 @@ class ShopliftingHeuristicsEngine:
                 if zone_id in state.zone_dwell:
                     del state.zone_dwell[zone_id]
 
-        if loitering_score > 0:
+        if loitering_score > 0 and current_zone_name:
             triggers.append(f'Loitering in {current_zone_name} ({int(current_loitering_seconds)}s)')
 
         total_score = min(100.0, concealment_score + nervous_score + loitering_score)
@@ -211,6 +223,19 @@ class ShopliftingHeuristicsEngine:
             'loiteringSeconds': round(current_loitering_seconds, 1),
             'nervousCount': nervous_count,
             'zoneName': current_zone_name,
-            'triggers': triggers
+            'triggers': triggers,
+            'waistBbox': [round(v, 1) for v in waist_bbox]
         }
 
+if __name__ == '__main__':
+    engine = ShopliftingHeuristicsEngine()
+    test_bbox = (100.0, 50.0, 300.0, 500.0)
+    test_kps = [
+        {'name': 'left_hip', 'x': 180.0, 'y': 300.0, 'confidence': 0.9},
+        {'name': 'right_hip', 'x': 220.0, 'y': 300.0, 'confidence': 0.9},
+        {'name': 'left_wrist', 'x': 190.0, 'y': 310.0, 'confidence': 0.85},
+        {'name': 'right_wrist', 'x': 250.0, 'y': 200.0, 'confidence': 0.85}
+    ]
+    test_items = [{'label': 'phone', 'confidence': 0.9, 'bbox': [170.0, 300.0, 210.0, 340.0]}]
+    res = engine.evaluate_person(1, test_bbox, test_kps, test_items, [], {})
+    print('Heuristics Engine Test Result:', res)

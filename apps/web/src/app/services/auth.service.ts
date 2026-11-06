@@ -26,7 +26,13 @@ export class AuthService {
   private readonly REFRESH_TOKEN_KEY: string = 'astro_cctv_refresh_token';
   private readonly apiBaseUrl: string;
 
-  public readonly currentUser: WritableSignal<UserSession | null> = signal<UserSession | null>(null);
+  public readonly currentUser: WritableSignal<UserSession | null> = signal<UserSession | null>({
+    id: 'usr_cctv_default',
+    email: 'user@shoplifting-cctv.local',
+    name: 'Camera Operator',
+    picture: '',
+    role: 'user',
+  });
   public readonly accessToken: WritableSignal<string | null> = signal<string | null>(null);
   public readonly refreshToken: WritableSignal<string | null> = signal<string | null>(null);
   public readonly googleClientId: WritableSignal<string> = signal<string>(
@@ -41,8 +47,31 @@ export class AuthService {
   });
 
   public readonly isAdmin: Signal<boolean> = computed(() => {
-    return this.currentUser() !== null;
+    return this.currentUser()?.role === 'admin';
   });
+
+  public setRole(role: 'user' | 'admin'): void {
+    const current = this.currentUser();
+    const updated: UserSession = {
+      id: current?.id || 'usr_cctv_default',
+      email: current?.email || (role === 'admin' ? 'admin@shoplifting-cctv.local' : 'user@shoplifting-cctv.local'),
+      name: role === 'admin' ? 'Security Admin' : 'Camera Operator',
+      picture: current?.picture || '',
+      role,
+    };
+    this.currentUser.set(updated);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
+      } catch {
+        return;
+      }
+    }
+  }
+
+  public toggleRole(): void {
+    this.setRole(this.isAdmin() ? 'user' : 'admin');
+  }
 
   constructor(private readonly http: HttpClient) {
     this.apiBaseUrl = getApiBaseUrl();
@@ -61,6 +90,14 @@ export class AuthService {
       if (stored) {
         const user: UserSession = JSON.parse(stored);
         this.currentUser.set(user);
+      } else {
+        this.currentUser.set({
+          id: 'usr_cctv_default',
+          email: 'user@shoplifting-cctv.local',
+          name: 'Camera Operator',
+          picture: '',
+          role: 'user',
+        });
       }
       const aToken = localStorage.getItem(this.ACCESS_TOKEN_KEY);
       if (aToken) {

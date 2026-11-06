@@ -3,19 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { WebSocketService } from '../../services/websocket.service';
+import { WebrtcService } from '../../services/webrtc.service';
 import { getApiBaseUrl } from '../../services/api-config';
-
-export interface CctvStationRecord {
-  stationId: string;
-  stationName: string;
-  status: 'ONLINE' | 'STREAMING' | 'DISCONNECTED';
-  lastSeen: number;
-  fps: number;
-  totalFrames: number;
-  activeDetectionsCount: number;
-  lastDetectedObjects: string[];
-  lastFrameSnapshot?: string;
-}
+import { CctvStationRecord } from '../../models/detection.model';
 
 @Component({
   selector: 'app-admin-cctv',
@@ -24,10 +15,14 @@ export interface CctvStationRecord {
   templateUrl: './admin-cctv.component.html',
 })
 export class AdminCctvComponent implements OnInit, OnDestroy {
-  public readonly stations: WritableSignal<CctvStationRecord[]> = signal<CctvStationRecord[]>([]);
   public readonly selectedStation: WritableSignal<CctvStationRecord | null> = signal<CctvStationRecord | null>(null);
   public readonly filterText: WritableSignal<string> = signal<string>('');
   public readonly isLoading: WritableSignal<boolean> = signal<boolean>(false);
+  public readonly activeWatchingStations: WritableSignal<string[]> = signal<string[]>([]);
+
+  public readonly stations: Signal<CctvStationRecord[]> = computed(() => {
+    return this.wsService.cctvStations();
+  });
 
   public readonly filteredStations: Signal<CctvStationRecord[]> = computed(() => {
     const q = this.filterText().toLowerCase().trim();
@@ -46,34 +41,40 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
     return this.stations().reduce((acc, s) => acc + s.activeDetectionsCount, 0);
   });
 
-  private pollIntervalId: any = null;
+  private pollIntervalId: ReturnType<typeof setInterval> | null = null;
   private readonly apiBaseUrl: string;
 
   constructor(
     public readonly authService: AuthService,
+    public readonly wsService: WebSocketService,
+    public readonly webrtcService: WebrtcService,
     private readonly http: HttpClient,
   ) {
     this.apiBaseUrl = getApiBaseUrl();
   }
 
   public ngOnInit(): void {
+    this.wsService.joinAsAdmin();
     this.fetchStations();
     this.pollIntervalId = setInterval(() => {
       this.fetchStations();
-    }, 2000);
+    }, 3000);
   }
 
   public ngOnDestroy(): void {
     if (this.pollIntervalId) {
       clearInterval(this.pollIntervalId);
     }
+    this.activeWatchingStations().forEach((sid) => {
+      this.webrtcService.stopWatchingStation(sid);
+    });
   }
 
   public fetchStations(): void {
     this.http.get<CctvStationRecord[]>(`${this.apiBaseUrl}/detection/cctv-stations`).subscribe({
       next: (data) => {
         if (Array.isArray(data)) {
-          this.stations.set(data);
+          this.wsService.cctvStations.set(data);
           const sel = this.selectedStation();
           if (sel) {
             const updated = data.find((s) => s.stationId === sel.stationId);
@@ -91,9 +92,29 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
 
   public selectStation(station: CctvStationRecord): void {
     this.selectedStation.set(station);
+    this.connectWebRtc(station.stationId);
+  }
+
+  public connectWebRtc(stationId: string): void {
+    this.webrtcService.watchStation(stationId);
+    this.activeWatchingStations.update((list) => {
+      if (!list.includes(stationId)) {
+        return [...list, stationId];
+      }
+      return list;
+    });
+  }
+
+  public getRemoteStream(stationId: string): MediaStream | null {
+    return this.webrtcService.getRemoteStreamSignal(stationId)();
   }
 
   public closeSelectedStation(): void {
+    const sel = this.selectedStation();
+    if (sel) {
+      this.webrtcService.stopWatchingStation(sel.stationId);
+      this.activeWatchingStations.update((list) => list.filter((id) => id !== sel.stationId));
+    }
     this.selectedStation.set(null);
   }
 
@@ -104,4 +125,3 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
     return `${Math.floor(diff / 60)}m ago`;
   }
 }
-

@@ -43,7 +43,9 @@ def run_ipc_loop(detector: YoloShopliftingDetector) -> None:
                     'boxes': [],
                     'poses': [],
                     'suspicion': [],
-                    'alertTriggered': False
+                    'alertTriggered': False,
+                    'isYoloActive': False,
+                    'engineError': str(exc)
                 }
             }
             sys.stdout.write(json.dumps(err_resp) + '\n')

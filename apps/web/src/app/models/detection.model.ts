@@ -28,6 +28,7 @@ export interface SuspicionBreakdown {
   nervousCount: number;
   zoneName?: string | null;
   triggers: string[];
+  waistBbox?: [number, number, number, number];
 }
 
 export interface FrameResult {
@@ -38,6 +39,22 @@ export interface FrameResult {
   suspicion: SuspicionBreakdown[];
   alertTriggered: boolean;
   annotatedFrame?: string;
+  isYoloActive?: boolean;
+  engineError?: string;
+  stationId?: string;
+  stationName?: string;
+}
+
+export interface CctvStationRecord {
+  stationId: string;
+  stationName: string;
+  status: 'ONLINE' | 'STREAMING' | 'DISCONNECTED';
+  lastSeen: number;
+  fps: number;
+  totalFrames: number;
+  activeDetectionsCount: number;
+  lastDetectedObjects: string[];
+  lastFrameSnapshot?: string;
 }
 
 export interface DetectionZone {
@@ -58,4 +75,3 @@ export interface StreamConfig {
   loiteringThresholdSeconds?: number;
   nervousCheckSensitivity?: number;
 }
-
