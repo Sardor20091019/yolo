@@ -6,12 +6,14 @@
     "apps/*"
   ],
   "scripts": {
+    "start": "node apps/api/dist/main.js",
+    "start:prod": "node apps/api/dist/main.js",
     "start:api": "npm --prefix apps/api run start:dev",
     "start:web": "npm --prefix apps/web run start",
     "start:worker": "python3 apps/python-worker/main.py",
     "build:api": "npm --prefix apps/api run build",
     "build:web": "npm --prefix apps/web run build",
-    "build": "pip3 install -r apps/python-worker/requirements.txt --break-system-packages 2>/dev/null || pip install -r apps/python-worker/requirements.txt 2>/dev/null || true; npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "build": "pip3 install --no-cache-dir -r apps/python-worker/requirements.txt 2>&1 || pip install --no-cache-dir -r apps/python-worker/requirements.txt 2>&1 || true; npm --prefix apps/api run build",
     "test:api": "npm --prefix apps/api run test",
     "test:worker": "python3 apps/python-worker/tests/test_heuristics.py"
   },

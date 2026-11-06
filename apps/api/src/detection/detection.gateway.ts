@@ -45,7 +45,10 @@ interface WebRtcSignalPayload {
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      callback(null, true);
+    },
+    credentials: true,
   },
   maxHttpBufferSize: 1e8,
 })

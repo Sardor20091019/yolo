@@ -239,6 +239,16 @@ export class WebSocketService {
         this.isYoloActive.set(false);
         const errMsg = err instanceof Error ? err.message : 'API connection failed';
         this.yoloErrorMessage.set(`Inference API error: ${errMsg}`);
+        this.latestResult.set({
+          frameIndex,
+          timestamp: Date.now(),
+          boxes: [],
+          poses: [],
+          suspicion: [],
+          alertTriggered: false,
+          isYoloActive: false,
+          engineError: `Inference API error: ${errMsg}`,
+        });
       },
     });
   }

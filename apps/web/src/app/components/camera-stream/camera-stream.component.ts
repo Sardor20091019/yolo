@@ -367,7 +367,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     const now = Date.now();
-    if (this.isProcessingFrame && now - this.lastSendTimestamp < 3500) {
+    if (this.isProcessingFrame && now - this.lastSendTimestamp < 1500) {
       return;
     }
 
