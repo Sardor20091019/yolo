@@ -93,7 +93,7 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
         if (sel && this.modalCanvasRef?.nativeElement && this.modalVideoRef?.nativeElement) {
           const canvas = this.modalCanvasRef.nativeElement;
           const video = this.modalVideoRef.nativeElement;
-          if (video.readyState >= 2) {
+          if (video.readyState >= 1 || video.videoWidth > 0) {
             const vw = video.videoWidth || 640;
             const vh = video.videoHeight || 360;
             if (canvas.width !== vw || canvas.height !== vh) {
@@ -101,21 +101,24 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
               canvas.height = vh;
             }
             const ctx = canvas.getContext('2d');
-            if (ctx) {
+            if (ctx && canvas.width > 0 && canvas.height > 0) {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
+              const scaleX = canvas.width / 640;
+              const scaleY = canvas.height / 360;
               if (sel.lastBoxes && sel.lastBoxes.length > 0) {
-                this.renderBoxes(ctx, sel.lastBoxes, canvas.width / 640, canvas.height / 360, sel.lastSuspicion || []);
+                this.renderBoxes(ctx, sel.lastBoxes, scaleX, scaleY, sel.lastSuspicion || []);
               }
               if (sel.lastPoses && sel.lastPoses.length > 0) {
-                this.renderPoses(ctx, sel.lastPoses, canvas.width / 640, canvas.height / 360);
+                this.renderPoses(ctx, sel.lastPoses, scaleX, scaleY);
               }
             }
           }
         }
-      } catch {
-        return;
+      } catch (err: unknown) {
+        console.error('Admin HUD render error:', err);
+      } finally {
+        this.animationId = requestAnimationFrame(loop);
       }
-      this.animationId = requestAnimationFrame(loop);
     };
     this.animationId = requestAnimationFrame(loop);
   }
@@ -130,44 +133,54 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
     });
 
     boxes.forEach((box) => {
-      if (!box || !box.bbox || box.bbox.length < 4) return;
-      const [bx1, by1, bx2, by2] = box.bbox;
-      const x1 = bx1 * scaleX;
-      const y1 = by1 * scaleY;
-      const x2 = bx2 * scaleX;
-      const y2 = by2 * scaleY;
-      const w = Math.max(4, x2 - x1);
-      const h = Math.max(4, y2 - y1);
-      const labelLower = (box.label || '').toLowerCase();
+      if (!box || !Array.isArray(box.bbox) || box.bbox.length < 4) return;
+      const b0 = Number(box.bbox[0]) || 0;
+      const b1 = Number(box.bbox[1]) || 0;
+      const b2 = Number(box.bbox[2]) || 0;
+      const b3 = Number(box.bbox[3]) || 0;
+
+      const x1 = b0 * scaleX;
+      const y1 = b1 * scaleY;
+      const x2 = b2 * scaleX;
+      const y2 = b3 * scaleY;
+      const w = Math.max(8, x2 - x1);
+      const h = Math.max(8, y2 - y1);
+
+      if (!isFinite(x1) || !isFinite(y1) || !isFinite(w) || !isFinite(h)) return;
+
+      const trackId = box.trackId !== undefined && box.trackId !== null ? box.trackId : 1;
+      const rawLabel = (box.label || 'object').trim();
+      const labelLower = rawLabel.toLowerCase();
+      const labelUpper = rawLabel.toUpperCase();
 
       let strokeColor = '#10b981';
-      let fillColor = 'rgba(16, 185, 129, 0.08)';
-      let labelText = `ID #${box.trackId} · ${box.label.toUpperCase()}`;
+      let fillColor = 'rgba(16, 185, 129, 0.12)';
+      let labelText = `ID #${trackId} · ${labelUpper}`;
 
       if (labelLower === 'person') {
-        const susp = suspMap.get(box.trackId);
-        const score = susp ? susp.score : 0;
+        const susp = suspMap.get(trackId);
+        const score = susp ? Number(susp.score) || 0 : 0;
         if (score >= 50 || (susp?.triggers && susp.triggers.length > 0)) {
           strokeColor = '#ef4444';
-          fillColor = 'rgba(239, 68, 68, 0.18)';
-          labelText = `ALERT #${box.trackId} · SUSP: ${Math.round(score)}%`;
+          fillColor = 'rgba(239, 68, 68, 0.2)';
+          labelText = `ALERT #${trackId} · SUSP: ${Math.round(score)}%`;
         } else if (score >= 25) {
           strokeColor = '#f59e0b';
-          fillColor = 'rgba(245, 158, 11, 0.12)';
-          labelText = `CAUTION #${box.trackId} · ${Math.round(score)}%`;
+          fillColor = 'rgba(245, 158, 11, 0.15)';
+          labelText = `CAUTION #${trackId} · ${Math.round(score)}%`;
         } else {
           strokeColor = '#10b981';
-          fillColor = 'rgba(16, 185, 129, 0.08)';
-          labelText = `PERSON #${box.trackId} · SAFE`;
+          fillColor = 'rgba(16, 185, 129, 0.1)';
+          labelText = `PERSON #${trackId} · SAFE`;
         }
       } else if (labelLower === 'face') {
         strokeColor = '#a855f7';
-        fillColor = 'rgba(168, 85, 247, 0.12)';
-        labelText = `FACE · ${Math.round((box.confidence || 0.95) * 100)}%`;
+        fillColor = 'rgba(168, 85, 247, 0.15)';
+        labelText = `FACE · ${Math.round((Number(box.confidence) || 0.95) * 100)}%`;
       } else {
         strokeColor = '#f59e0b';
-        fillColor = 'rgba(245, 158, 11, 0.1)';
-        labelText = `${box.label.toUpperCase()} · ${Math.round((box.confidence || 0.85) * 100)}%`;
+        fillColor = 'rgba(245, 158, 11, 0.12)';
+        labelText = `${labelUpper} · ${Math.round((Number(box.confidence) || 0.85) * 100)}%`;
       }
 
       ctx.strokeStyle = strokeColor;
@@ -179,16 +192,19 @@ export class AdminCctvComponent implements OnInit, OnDestroy {
       ctx.font = '600 12px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
       const badgeH = 22;
-      const badgeW = Math.max(textMetrics.width + 16, 80);
-      const badgeY = Math.max(0, y1 - badgeH);
+      const badgeW = Math.max(textMetrics.width + 16, 70);
+      const badgeY = Math.max(0, y1 - badgeH - 3);
+
+      const safeX = Math.max(0, Math.min(ctx.canvas.width - badgeW, x1));
+      const safeY = Math.max(0, Math.min(ctx.canvas.height - badgeH, badgeY));
 
       ctx.fillStyle = '#111110';
-      ctx.fillRect(x1, badgeY, badgeW, badgeH);
+      ctx.fillRect(safeX, safeY, badgeW, badgeH);
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1, badgeY, badgeW, badgeH);
+      ctx.strokeRect(safeX, safeY, badgeW, badgeH);
       ctx.fillStyle = '#f0ede6';
-      ctx.fillText(labelText, x1 + 8, badgeY + 15);
+      ctx.fillText(labelText, safeX + 8, safeY + 15);
     });
   }
 

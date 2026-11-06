@@ -423,8 +423,8 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       frameData,
       fallback.boxes.map((b) => b.label),
     );
-    await this.evaluateSuspicionAndTriggerAlerts(fallback, frameData);
-    await this.persistAnalyzedDetections(fallback, stationId, stationName, userId);
+    void this.evaluateSuspicionAndTriggerAlerts(fallback, frameData).catch(() => {});
+    void this.persistAnalyzedDetections(fallback, stationId, stationName, userId).catch(() => {});
     return fallback;
   }
 

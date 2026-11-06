@@ -42,10 +42,10 @@ export class WebSocketService {
 
     try {
       this.socket = io(socketUrl, {
-        transports: ['websocket', 'polling'],
-        reconnectionAttempts: 10,
-        reconnectionDelay: 2000,
-        timeout: 8000,
+        transports: ['polling', 'websocket'],
+        reconnectionAttempts: 15,
+        reconnectionDelay: 1500,
+        timeout: 10000,
       });
 
       this.webrtcService.initSignaling(this.socket);

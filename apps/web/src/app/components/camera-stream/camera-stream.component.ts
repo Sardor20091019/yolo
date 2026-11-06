@@ -87,7 +87,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           this.currentSuspicion = suspicion;
           this.currentDetectionsCount.set(boxes.length);
           this.lastDetectionReceivedAt = Date.now();
-        } else if (Date.now() - this.lastDetectionReceivedAt > 3500) {
+        } else if (Date.now() - this.lastDetectionReceivedAt > 1500) {
           this.currentDetections = [];
           this.currentPoses = [];
           this.currentSuspicion = [];
@@ -96,12 +96,12 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
 
         if (boxes.length > 0) {
           const chips = boxes.map((d) => ({
-            label: d.label,
-            confidence: Math.round(d.confidence * 100),
+            label: (d.label || 'object').toLowerCase(),
+            confidence: Math.round((Number(d.confidence) || 0.85) * 100),
           }));
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
-        } else if (Date.now() - this.lastDetectionReceivedAt > 3500) {
+        } else if (Date.now() - this.lastDetectionReceivedAt > 1500) {
           this.detectedObjectChips.set([]);
         }
 
@@ -440,7 +440,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           const video = this.videoRef?.nativeElement;
           const canvas = this.hudCanvasRef?.nativeElement;
 
-          if (video && canvas && video.readyState >= 2) {
+          if (video && canvas && (video.readyState >= 1 || video.videoWidth > 0)) {
             const vWidth = video.videoWidth || 1280;
             const vHeight = video.videoHeight || 720;
 
@@ -450,24 +450,27 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             }
 
             const ctx = canvas.getContext('2d');
-            if (ctx) {
+            if (ctx && canvas.width > 0 && canvas.height > 0) {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
               const posesToRender = this.currentPoses;
               const boxesToRender = this.currentDetections;
 
-              const scaleX = canvas.width / (this.sentFrameWidth || canvas.width);
-              const scaleY = canvas.height / (this.sentFrameHeight || canvas.height);
+              const sentW = this.sentFrameWidth > 0 ? this.sentFrameWidth : canvas.width;
+              const sentH = this.sentFrameHeight > 0 ? this.sentFrameHeight : canvas.height;
+              const scaleX = sentW > 0 && isFinite(canvas.width / sentW) ? canvas.width / sentW : 1;
+              const scaleY = sentH > 0 && isFinite(canvas.height / sentH) ? canvas.height / sentH : 1;
 
               this.renderPoses(ctx, posesToRender, scaleX, scaleY);
               this.renderBoxes(ctx, boxesToRender, scaleX, scaleY);
             }
           }
         }
-      } catch {
-        return;
+      } catch (err: unknown) {
+        console.error('HUD render error:', err);
+      } finally {
+        this.renderAnimationId = requestAnimationFrame(loop);
       }
-      this.renderAnimationId = requestAnimationFrame(loop);
     };
     this.renderAnimationId = requestAnimationFrame(loop);
   }
@@ -495,10 +498,16 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
             const kp1 = kps[i1];
             const kp2 = kps[i2];
             if (kp1 && kp2 && kp1.confidence >= 0.2 && kp2.confidence >= 0.2 && kp1.x > 0 && kp2.x > 0 && kp1.y > 0 && kp2.y > 0) {
-              ctx.beginPath();
-              ctx.moveTo(kp1.x * scaleX, kp1.y * scaleY);
-              ctx.lineTo(kp2.x * scaleX, kp2.y * scaleY);
-              ctx.stroke();
+              const x1 = kp1.x * scaleX;
+              const y1 = kp1.y * scaleY;
+              const x2 = kp2.x * scaleX;
+              const y2 = kp2.y * scaleY;
+              if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+              }
             }
           }
         });
@@ -509,16 +518,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           const sx = kp.x * scaleX;
           const sy = kp.y * scaleY;
 
-          ctx.beginPath();
-          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fill();
+          if (isFinite(sx) && isFinite(sy)) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
 
-          ctx.beginPath();
-          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#06b6d4';
-          ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#06b6d4';
+            ctx.stroke();
+          }
         }
       });
     });
@@ -530,7 +541,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     const suspicionMap = new Map<number, SuspicionBreakdown>();
-    this.currentSuspicion.forEach((s) => {
+    (this.currentSuspicion || []).forEach((s) => {
       if (s && s.trackId !== undefined) {
         suspicionMap.set(s.trackId, s);
       }
@@ -539,16 +550,23 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     const activeKeys = new Set<string>();
 
     boxes.forEach((box) => {
-      if (!box || !box.bbox || box.bbox.length < 4) {
+      if (!box || !Array.isArray(box.bbox) || box.bbox.length < 4) {
         return;
       }
       const rawBbox = box.bbox;
-      const targetX1 = rawBbox[0] * scaleX;
-      const targetY1 = rawBbox[1] * scaleY;
-      const targetX2 = rawBbox[2] * scaleX;
-      const targetY2 = rawBbox[3] * scaleY;
+      const b0 = Number(rawBbox[0]) || 0;
+      const b1 = Number(rawBbox[1]) || 0;
+      const b2 = Number(rawBbox[2]) || 0;
+      const b3 = Number(rawBbox[3]) || 0;
 
-      const boxKey = `${box.trackId}_${box.label}`;
+      const targetX1 = b0 * scaleX;
+      const targetY1 = b1 * scaleY;
+      const targetX2 = b2 * scaleX;
+      const targetY2 = b3 * scaleY;
+
+      const trackId = box.trackId !== undefined && box.trackId !== null ? box.trackId : 1;
+      const rawLabel = (box.label || 'object').trim();
+      const boxKey = `${trackId}_${rawLabel}`;
       activeKeys.add(boxKey);
 
       let x1 = targetX1;
@@ -557,63 +575,73 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       let y2 = targetY2;
 
       const prev = this.smoothedBoxes.get(boxKey);
-      if (prev) {
-        x1 = prev[0] + (targetX1 - prev[0]) * 0.45;
-        y1 = prev[1] + (targetY1 - prev[1]) * 0.45;
-        x2 = prev[2] + (targetX2 - prev[2]) * 0.45;
-        y2 = prev[3] + (targetY2 - prev[3]) * 0.45;
+      if (prev && isFinite(prev[0]) && isFinite(prev[1]) && isFinite(prev[2]) && isFinite(prev[3])) {
+        x1 = prev[0] + (targetX1 - prev[0]) * 0.55;
+        y1 = prev[1] + (targetY1 - prev[1]) * 0.55;
+        x2 = prev[2] + (targetX2 - prev[2]) * 0.55;
+        y2 = prev[3] + (targetY2 - prev[3]) * 0.55;
       }
       this.smoothedBoxes.set(boxKey, [x1, y1, x2, y2]);
 
-      const w = Math.max(4, x2 - x1);
-      const h = Math.max(4, y2 - y1);
-      const labelLower = (box.label || '').toLowerCase();
+      const w = Math.max(8, x2 - x1);
+      const h = Math.max(8, y2 - y1);
+      const labelLower = rawLabel.toLowerCase();
+      const labelUpper = rawLabel.toUpperCase();
 
       let strokeColor = '#10b981';
-      let fillColor = 'rgba(16, 185, 129, 0.08)';
-      let labelText = `ID #${box.trackId} · ${box.label.toUpperCase()}`;
+      let fillColor = 'rgba(16, 185, 129, 0.12)';
+      let labelText = `ID #${trackId} · ${labelUpper}`;
 
       if (labelLower === 'person') {
-        const susp = suspicionMap.get(box.trackId);
-        const score = susp ? susp.score : 0;
+        const susp = suspicionMap.get(trackId);
+        const score = susp ? Number(susp.score) || 0 : 0;
         if (score >= 50 || (susp?.triggers && susp.triggers.length > 0)) {
           strokeColor = '#ef4444';
-          fillColor = 'rgba(239, 68, 68, 0.18)';
-          labelText = `ALERT #${box.trackId} · SUSP: ${Math.round(score)}%`;
+          fillColor = 'rgba(239, 68, 68, 0.2)';
+          labelText = `ALERT #${trackId} · SUSP: ${Math.round(score)}%`;
         } else if (score >= 25) {
           strokeColor = '#f59e0b';
-          fillColor = 'rgba(245, 158, 11, 0.12)';
-          labelText = `CAUTION #${box.trackId} · ${Math.round(score)}%`;
+          fillColor = 'rgba(245, 158, 11, 0.15)';
+          labelText = `CAUTION #${trackId} · ${Math.round(score)}%`;
         } else {
           strokeColor = '#10b981';
-          fillColor = 'rgba(16, 185, 129, 0.08)';
-          labelText = `PERSON #${box.trackId} · SAFE`;
+          fillColor = 'rgba(16, 185, 129, 0.1)';
+          labelText = `PERSON #${trackId} · SAFE`;
         }
 
-        if (susp?.waistBbox) {
-          const [wx1, wy1, wx2, wy2] = susp.waistBbox;
-          ctx.strokeStyle = '#c084fc';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(wx1 * scaleX, wy1 * scaleY, (wx2 - wx1) * scaleX, (wy2 - wy1) * scaleY);
+        if (susp?.waistBbox && Array.isArray(susp.waistBbox) && susp.waistBbox.length === 4) {
+          const wx1 = (Number(susp.waistBbox[0]) || 0) * scaleX;
+          const wy1 = (Number(susp.waistBbox[1]) || 0) * scaleY;
+          const wx2 = (Number(susp.waistBbox[2]) || 0) * scaleX;
+          const wy2 = (Number(susp.waistBbox[3]) || 0) * scaleY;
+          if (isFinite(wx1) && isFinite(wy1) && isFinite(wx2) && isFinite(wy2)) {
+            ctx.strokeStyle = '#c084fc';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(wx1, wy1, Math.max(4, wx2 - wx1), Math.max(4, wy2 - wy1));
+          }
         }
       } else if (labelLower === 'face') {
         strokeColor = '#a855f7';
-        fillColor = 'rgba(168, 85, 247, 0.12)';
-        labelText = `FACE · ${Math.round((box.confidence || 0.95) * 100)}%`;
+        fillColor = 'rgba(168, 85, 247, 0.15)';
+        labelText = `FACE · ${Math.round((Number(box.confidence) || 0.95) * 100)}%`;
       } else {
         strokeColor = '#f59e0b';
-        fillColor = 'rgba(245, 158, 11, 0.1)';
-        labelText = `${box.label.toUpperCase()} · ${Math.round((box.confidence || 0.85) * 100)}%`;
+        fillColor = 'rgba(245, 158, 11, 0.12)';
+        labelText = `${labelUpper} · ${Math.round((Number(box.confidence) || 0.85) * 100)}%`;
+      }
+
+      if (!isFinite(x1) || !isFinite(y1) || !isFinite(w) || !isFinite(h)) {
+        return;
       }
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2;
       ctx.strokeRect(x1, y1, w, h);
 
       ctx.fillStyle = fillColor;
       ctx.fillRect(x1, y1, w, h);
 
-      const bracketLen = Math.min(16, Math.min(w, h) * 0.25);
+      const bracketLen = Math.min(20, Math.min(w, h) * 0.25);
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(x1, y1 + bracketLen);
@@ -636,26 +664,29 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       ctx.font = '600 12px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
       const badgeH = 22;
-      const badgeW = Math.max(textMetrics.width + 16, 80);
+      const badgeW = Math.max(textMetrics.width + 16, 70);
       const badgeY = Math.max(0, y1 - badgeH - 3);
+
+      const safeX = Math.max(0, Math.min(ctx.canvas.width - badgeW, x1));
+      const safeY = Math.max(0, Math.min(ctx.canvas.height - badgeH, badgeY));
 
       ctx.fillStyle = '#111110';
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
-        ctx.roundRect(x1, badgeY, badgeW, badgeH, 4);
+        ctx.roundRect(safeX, safeY, badgeW, badgeH, 4);
         ctx.fill();
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       } else {
-        ctx.fillRect(x1, badgeY, badgeW, badgeH);
+        ctx.fillRect(safeX, safeY, badgeW, badgeH);
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(x1, badgeY, badgeW, badgeH);
+        ctx.strokeRect(safeX, safeY, badgeW, badgeH);
       }
 
       ctx.fillStyle = '#f0ede6';
-      ctx.fillText(labelText, x1 + 8, badgeY + 15);
+      ctx.fillText(labelText, safeX + 8, safeY + 15);
     });
 
     if (this.smoothedBoxes.size > 20) {

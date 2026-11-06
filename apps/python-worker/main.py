@@ -80,14 +80,16 @@ async def handle_ws_client(websocket, detector: YoloShopliftingDetector) -> None
             await websocket.send(json.dumps(response))
         except Exception as exc:
             err_resp = {
-                'requestId': 0,
+                'requestId': req.get('requestId', 0) if 'req' in locals() else 0,
                 'error': str(exc),
                 'result': {
-                    'frameIndex': 0,
+                    'frameIndex': req.get('frameIndex', 0) if 'req' in locals() else 0,
                     'boxes': [],
                     'poses': [],
                     'suspicion': [],
-                    'alertTriggered': False
+                    'alertTriggered': False,
+                    'isYoloActive': False,
+                    'engineError': str(exc)
                 }
             }
             await websocket.send(json.dumps(err_resp))
