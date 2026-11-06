@@ -59,6 +59,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private isProcessingFrame: boolean = false;
   private sentFrameWidth: number = 640;
   private sentFrameHeight: number = 360;
+  private readonly smoothedBoxes: Map<string, [number, number, number, number]> = new Map();
 
   constructor(
     public readonly wsService: WebSocketService,
@@ -535,15 +536,35 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
     });
 
+    const activeKeys = new Set<string>();
+
     boxes.forEach((box) => {
       if (!box || !box.bbox || box.bbox.length < 4) {
         return;
       }
       const rawBbox = box.bbox;
-      const x1 = rawBbox[0] * scaleX;
-      const y1 = rawBbox[1] * scaleY;
-      const x2 = rawBbox[2] * scaleX;
-      const y2 = rawBbox[3] * scaleY;
+      const targetX1 = rawBbox[0] * scaleX;
+      const targetY1 = rawBbox[1] * scaleY;
+      const targetX2 = rawBbox[2] * scaleX;
+      const targetY2 = rawBbox[3] * scaleY;
+
+      const boxKey = `${box.trackId}_${box.label}`;
+      activeKeys.add(boxKey);
+
+      let x1 = targetX1;
+      let y1 = targetY1;
+      let x2 = targetX2;
+      let y2 = targetY2;
+
+      const prev = this.smoothedBoxes.get(boxKey);
+      if (prev) {
+        x1 = prev[0] + (targetX1 - prev[0]) * 0.45;
+        y1 = prev[1] + (targetY1 - prev[1]) * 0.45;
+        x2 = prev[2] + (targetX2 - prev[2]) * 0.45;
+        y2 = prev[3] + (targetY2 - prev[3]) * 0.45;
+      }
+      this.smoothedBoxes.set(boxKey, [x1, y1, x2, y2]);
+
       const w = Math.max(4, x2 - x1);
       const h = Math.max(4, y2 - y1);
       const labelLower = (box.label || '').toLowerCase();
@@ -586,27 +607,63 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 1.5;
       ctx.strokeRect(x1, y1, w, h);
 
       ctx.fillStyle = fillColor;
       ctx.fillRect(x1, y1, w, h);
 
+      const bracketLen = Math.min(16, Math.min(w, h) * 0.25);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1 + bracketLen);
+      ctx.lineTo(x1, y1);
+      ctx.lineTo(x1 + bracketLen, y1);
+
+      ctx.moveTo(x2 - bracketLen, y1);
+      ctx.lineTo(x2, y1);
+      ctx.lineTo(x2, y1 + bracketLen);
+
+      ctx.moveTo(x1, y2 - bracketLen);
+      ctx.lineTo(x1, y2);
+      ctx.lineTo(x1 + bracketLen, y2);
+
+      ctx.moveTo(x2 - bracketLen, y2);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x2, y2 - bracketLen);
+      ctx.stroke();
+
       ctx.font = '600 12px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(labelText);
       const badgeH = 22;
       const badgeW = Math.max(textMetrics.width + 16, 80);
-      const badgeY = Math.max(0, y1 - badgeH);
+      const badgeY = Math.max(0, y1 - badgeH - 3);
 
       ctx.fillStyle = '#111110';
-      ctx.fillRect(x1, badgeY, badgeW, badgeH);
-
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1, badgeY, badgeW, badgeH);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(x1, badgeY, badgeW, badgeH, 4);
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        ctx.fillRect(x1, badgeY, badgeW, badgeH);
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x1, badgeY, badgeW, badgeH);
+      }
 
       ctx.fillStyle = '#f0ede6';
       ctx.fillText(labelText, x1 + 8, badgeY + 15);
     });
+
+    if (this.smoothedBoxes.size > 20) {
+      for (const key of this.smoothedBoxes.keys()) {
+        if (!activeKeys.has(key)) {
+          this.smoothedBoxes.delete(key);
+        }
+      }
+    }
   }
 }

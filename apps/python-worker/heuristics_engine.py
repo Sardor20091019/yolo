@@ -5,7 +5,9 @@ from typing import Dict, List, Tuple, Any, Optional
 PORTABLE_ITEMS = {
     'bottle', 'cell phone', 'phone', 'book', 'cup', 'backpack', 'bag', 'handbag',
     'remote', 'clock', 'scissors', 'toothbrush', 'umbrella', 'laptop', 'mouse',
-    'wallet', 'wine glass', 'glass'
+    'wallet', 'wine glass', 'glass', 'vase', 'teddy bear', 'toy', 'hair drier',
+    'cosmetics', 'knife', 'fork', 'spoon', 'cutlery', 'produce', 'food', 'apple',
+    'banana', 'orange', 'sandwich'
 }
 
 class TrackState:
@@ -18,6 +20,8 @@ class TrackState:
         self.concealment_events: List[float] = []
         self.zone_dwell: Dict[str, float] = {}
         self.zone_entry_time: Dict[str, float] = {}
+        self.head_turns: List[float] = []
+        self.last_head_direction: Optional[str] = None
 
     def reset(self) -> None:
         self.wrist_in_waist_prev = {'left': False, 'right': False}
@@ -26,6 +30,8 @@ class TrackState:
         self.concealment_events.clear()
         self.zone_dwell.clear()
         self.zone_entry_time.clear()
+        self.head_turns.clear()
+        self.last_head_direction = None
 
 class ShopliftingHeuristicsEngine:
     def __init__(self):
@@ -121,6 +127,9 @@ class ShopliftingHeuristicsEngine:
 
         left_wrist = next((kp for kp in keypoints if kp.get('name') == 'left_wrist'), None)
         right_wrist = next((kp for kp in keypoints if kp.get('name') == 'right_wrist'), None)
+        nose = next((kp for kp in keypoints if kp.get('name') == 'nose'), None)
+        left_ear = next((kp for kp in keypoints if kp.get('name') == 'left_ear'), None)
+        right_ear = next((kp for kp in keypoints if kp.get('name') == 'right_ear'), None)
 
         waist_bbox = self.calculate_waist_zone(keypoints, person_bbox)
 
@@ -135,7 +144,7 @@ class ShopliftingHeuristicsEngine:
             for wrist in [left_wrist, right_wrist]:
                 if wrist and wrist.get('confidence', 0) > 0.25:
                     d = self.distance((wrist['x'], wrist['y']), item_center)
-                    if d < max(70.0, item_radius):
+                    if d < max(75.0, item_radius):
                         state.portable_item_interactions.append((now, item_label))
 
         state.portable_item_interactions = [
@@ -172,6 +181,22 @@ class ShopliftingHeuristicsEngine:
         if nervous_count >= nervous_sensitivity:
             nervous_score = min(35.0, 15.0 + (nervous_count - nervous_sensitivity + 1) * 7.0)
             triggers.append(f'Nervous waist check ({nervous_count}x in {int(window_seconds)}s)')
+
+        scanning_score = 0.0
+        if nose and left_ear and right_ear:
+            if nose.get('confidence', 0) > 0.25 and left_ear.get('confidence', 0) > 0.25 and right_ear.get('confidence', 0) > 0.25:
+                ear_span = abs(right_ear['x'] - left_ear['x'])
+                if ear_span > 15.0:
+                    yaw = (nose['x'] - min(left_ear['x'], right_ear['x'])) / ear_span
+                    curr_direction = 'left' if yaw < 0.35 else ('right' if yaw > 0.65 else 'center')
+                    if curr_direction in ['left', 'right'] and curr_direction != state.last_head_direction:
+                        state.head_turns.append(now)
+                        state.last_head_direction = curr_direction
+
+        state.head_turns = [t for t in state.head_turns if now - t <= 4.0]
+        if len(state.head_turns) >= 3:
+            scanning_score = min(25.0, 10.0 + (len(state.head_turns) - 2) * 5.0)
+            triggers.append(f'Rapid surveillance scanning ({len(state.head_turns)} head turns in 4s)')
 
         person_base_x = (person_bbox[0] + person_bbox[2]) / 2.0
         person_base_y = person_bbox[3]
@@ -212,13 +237,14 @@ class ShopliftingHeuristicsEngine:
         if loitering_score > 0 and current_zone_name:
             triggers.append(f'Loitering in {current_zone_name} ({int(current_loitering_seconds)}s)')
 
-        total_score = min(100.0, concealment_score + nervous_score + loitering_score)
+        total_score = min(100.0, concealment_score + nervous_score + scanning_score + loitering_score)
 
         return {
             'trackId': track_id,
             'score': round(total_score, 1),
             'concealmentScore': round(concealment_score, 1),
             'nervousCheckScore': round(nervous_score, 1),
+            'scanningScore': round(scanning_score, 1),
             'loiteringScore': round(loitering_score, 1),
             'loiteringSeconds': round(current_loitering_seconds, 1),
             'nervousCount': nervous_count,

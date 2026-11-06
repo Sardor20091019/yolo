@@ -61,6 +61,10 @@ export class WebSocketService {
         this.isConnected.set(false);
       });
 
+      this.socket.on('connect_error', (err) => {
+        this.isConnected.set(false);
+      });
+
       this.socket.on('detection_results', (data: FrameResult) => {
         this.latestResult.set(data);
         if (data.isYoloActive !== undefined) {

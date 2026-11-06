@@ -31,6 +31,7 @@ MAP_COCO_TO_RETAIL = {
     'cup': 'cup',
     'handbag': 'bag',
     'backpack': 'backpack',
+    'suitcase': 'bag',
     'book': 'book',
     'laptop': 'laptop',
     'mouse': 'mouse',
@@ -41,7 +42,23 @@ MAP_COCO_TO_RETAIL = {
     'clock': 'clock',
     'umbrella': 'umbrella',
     'scissors': 'scissors',
-    'wine glass': 'glass'
+    'wine glass': 'glass',
+    'vase': 'vase',
+    'remote': 'remote',
+    'toothbrush': 'cosmetics',
+    'hair drier': 'cosmetics',
+    'teddy bear': 'toy',
+    'knife': 'knife',
+    'fork': 'cutlery',
+    'spoon': 'cutlery',
+    'bowl': 'bowl',
+    'apple': 'produce',
+    'banana': 'produce',
+    'orange': 'produce',
+    'sandwich': 'food',
+    'pizza': 'food',
+    'donut': 'food',
+    'cake': 'food'
 }
 
 class YoloShopliftingDetector:
@@ -60,6 +77,7 @@ class YoloShopliftingDetector:
         self.device = 'cpu'
         self.has_ultralytics = False
         self.simulation_step = 0
+        self.smoothed_bboxes: Dict[int, List[float]] = {}
 
         self.initialize_models(
             detection_model_path,
@@ -433,11 +451,21 @@ class YoloShopliftingDetector:
                 retail_label = MAP_COCO_TO_RETAIL.get(raw_label, raw_label)
                 track_id = int(boxes.id[i].item()) if getattr(boxes, 'id', None) is not None and boxes.id[i] is not None else (i + 1)
 
+                prev_b = self.smoothed_bboxes.get(track_id)
+                if prev_b is not None and len(prev_b) == 4:
+                    smoothed_xyxy = [
+                        round(0.75 * cur + 0.25 * prv, 1)
+                        for cur, prv in zip(xyxy, prev_b)
+                    ]
+                else:
+                    smoothed_xyxy = [round(x, 1) for x in xyxy]
+                self.smoothed_bboxes[track_id] = smoothed_xyxy
+
                 item_info = {
                     'trackId': track_id,
                     'label': retail_label,
                     'confidence': round(conf, 2),
-                    'bbox': [round(x, 1) for x in xyxy]
+                    'bbox': smoothed_xyxy
                 }
                 boxes_out.append(item_info)
 
