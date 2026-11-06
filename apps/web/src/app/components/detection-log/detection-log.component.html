@@ -1,100 +1,88 @@
-<div class="flex flex-col border hairline overflow-hidden rounded bg-white dark:bg-[#0b0b09] shadow-sm dark:shadow-none">
+<div class="flex flex-col glass-card overflow-hidden rounded-xl">
 
-  <div class="flex items-center justify-between px-5 py-3 border-b hairline bg-slate-50 dark:bg-[#111110]">
-    <div class="flex items-center space-x-3">
-      <div class="status-dot" style="background:#10b981"></div>
-      <div>
-        <div class="font-sans text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white">Detection History</div>
-        <div class="label" style="font-size:0.6rem">Live detections logged in real time &bull; {{ logService.logs().length }} entries</div>
+  <div class="flex items-center justify-between px-5 py-3 border-b hairline bg-slate-50 dark:bg-slate-900/60">
+    <div>
+      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">Activity Log</h3>
+      <div class="text-[0.68rem] text-slate-500">{{ logService.logs().length }} events recorded</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 divide-x border-b flex-shrink-0 hairline bg-white/40 dark:bg-slate-900/30">
+    <div class="px-4 py-2.5">
+      <div class="text-[0.65rem] text-slate-500">Total detected</div>
+      <div class="text-sm font-bold text-slate-900 dark:text-white mt-0.5">{{ logService.totalDetectionsCount() }}</div>
+    </div>
+    <div class="px-4 py-2.5">
+      <div class="text-[0.65rem] text-slate-500">Unique items</div>
+      <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ logService.uniqueObjectsCount() }}</div>
+    </div>
+    <div class="px-4 py-2.5">
+      <div class="text-[0.65rem] text-slate-500">Most frequent</div>
+      <div class="text-xs font-bold truncate text-slate-800 dark:text-slate-200 mt-0.5">
+        {{ logService.topDetectedObject() || 'None' }}
       </div>
     </div>
   </div>
 
-  <div class="grid grid-cols-3 divide-x border-b flex-shrink-0 hairline bg-white dark:bg-[#0b0b09]">
-    <div class="px-4 py-3">
-      <div class="label" style="font-size:0.58rem">TOTAL DETECTIONS</div>
-      <div class="metric-num text-lg mt-1 text-slate-900 dark:text-[#d0cdc4]">{{ logService.totalDetectionsCount() }}</div>
-    </div>
-    <div class="px-4 py-3">
-      <div class="label" style="font-size:0.58rem">UNIQUE OBJECTS</div>
-      <div class="metric-num text-lg mt-1 text-emerald-600 dark:text-[#10b981]">{{ logService.uniqueObjectsCount() }}</div>
-    </div>
-    <div class="px-4 py-3">
-      <div class="label" style="font-size:0.58rem">TOP DETECTED</div>
-      <div class="font-mono text-xs font-semibold uppercase tracking-wider truncate text-amber-500 mt-1.5" style="letter-spacing:0.08em">
-        {{ logService.topDetectedObject() }}
-      </div>
-    </div>
-  </div>
+  <div class="px-4 py-2 border-b hairline flex items-center justify-between gap-2 bg-white/20 dark:bg-slate-900/20">
+    <input
+      type="text"
+      [ngModel]="logService.searchTerm()"
+      (ngModelChange)="onSearchChange($event)"
+      placeholder="Search log..."
+      class="flex-1 text-xs py-1 px-2.5 rounded border hairline bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"/>
 
-  <div class="px-5 py-2.5 border-b hairline flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 dark:bg-[#0b0b09]">
-    <div class="relative flex-1 min-w-[200px]">
-      <input
-        type="text"
-        [ngModel]="logService.searchTerm()"
-        (ngModelChange)="onSearchChange($event)"
-        placeholder="Filter by object name (e.g. person, face, cell phone)..."
-        class="w-full font-mono text-xs py-1.5 px-3 border hairline rounded bg-white dark:bg-[#111110] text-slate-900 dark:text-[#8c8880] outline-none"/>
-    </div>
-
-    <div class="flex items-center space-x-2">
+    <div class="flex items-center space-x-1.5">
       <button
         type="button"
         (click)="logService.exportLogsJson()"
         [disabled]="logService.logs().length === 0"
-        class="btn-ghost disabled:opacity-30"
-        style="border-radius:3px; font-size:0.65rem">
-        EXPORT JSON
+        class="btn text-xs py-1 px-2.5 border hairline bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30">
+        Export
       </button>
 
       <button
         type="button"
         (click)="clearAllLogs()"
         [disabled]="logService.logs().length === 0"
-        class="btn-danger disabled:opacity-30"
-        style="border-radius:3px; font-size:0.65rem">
-        CLEAR
+        class="btn text-xs py-1 px-2.5 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-30">
+        Clear
       </button>
     </div>
   </div>
 
   <div class="flex-1 overflow-y-auto max-h-[380px] p-3 space-y-2">
 
-    <div *ngIf="logService.filteredLogs().length === 0" class="py-14 text-center">
-      <svg class="w-8 h-8 mx-auto mb-3 stroke-slate-300 dark:stroke-[#2e2c29]" viewBox="0 0 24 24" fill="none" stroke-width="1.25">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-      </svg>
-      <div class="label" style="letter-spacing:0.1em">NO DETECTIONS RECORDED YET</div>
-      <div class="text-xs font-sans mt-1 text-slate-500 dark:text-[#524f4b]">Start the camera stream to record real-time detected objects into history.</div>
+    <div *ngIf="logService.filteredLogs().length === 0" class="py-12 text-center text-xs text-slate-500">
+      <div>No activity recorded yet</div>
+      <div class="text-[0.68rem] mt-0.5 text-slate-400">Detected items will appear here when the camera is running.</div>
     </div>
 
     <div
       *ngFor="let item of logService.filteredLogs()"
-      class="flex items-center justify-between p-3 border hairline transition-colors rounded bg-slate-50/60 hover:bg-slate-100 dark:bg-[#111110] dark:hover:bg-[#171715]">
+      class="flex items-center justify-between p-2.5 rounded-lg border hairline bg-white/50 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/70 transition-colors">
 
-      <div class="flex items-center space-x-3">
-        <div class="w-7 h-7 flex items-center justify-center font-mono text-xs border hairline rounded bg-white dark:bg-[#171715] text-emerald-600 dark:text-[#10b981]">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-7 h-7 rounded flex items-center justify-center font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
           {{ item.label.slice(0, 1).toUpperCase() }}
         </div>
         <div>
           <div class="flex items-center space-x-2">
-            <span class="font-mono text-xs font-medium uppercase tracking-wider text-slate-900 dark:text-[#f0ede6]">
+            <span class="text-xs font-semibold text-slate-900 dark:text-white capitalize">
               {{ item.label }}
             </span>
-            <span class="tag tag-green" style="border-radius:2px; font-size:0.55rem">
-              {{ roundConfidence(item.confidence) }}% CONF
+            <span class="tag tag-green text-[0.65rem] py-0.2 px-1.5">
+              {{ roundConfidence(item.confidence) }}%
             </span>
           </div>
-          <div class="label flex items-center space-x-2 mt-0.5" style="font-size:0.58rem">
-            <span>First: {{ formatTime(item.firstSeen) }}</span>
-            <span>&bull;</span>
-            <span>Last: {{ formatTime(item.lastSeen) }}</span>
+          <div class="text-[0.65rem] text-slate-400 mt-0.5">
+            {{ formatTime(item.lastSeen) }}
           </div>
         </div>
       </div>
 
-      <div class="text-right">
-        <span class="tag" style="border-radius:2px; font-size:0.6rem">
+      <div>
+        <span class="text-xs font-semibold text-slate-500">
           &times;{{ item.occurrences }}
         </span>
       </div>

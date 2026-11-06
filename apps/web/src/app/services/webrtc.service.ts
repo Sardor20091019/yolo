@@ -33,6 +33,7 @@ export class WebrtcService {
   private readonly broadcasterPeerConnections: Map<string, RTCPeerConnection> = new Map();
   private readonly viewerPeerConnections: Map<string, RTCPeerConnection> = new Map();
   private readonly remoteStreamsMap: Map<string, WritableSignal<MediaStream | null>> = new Map();
+  private readonly pendingIceCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
 
   public readonly isBroadcasting: WritableSignal<boolean> = signal<boolean>(false);
   public readonly currentStationId: WritableSignal<string> = signal<string>('');
@@ -220,6 +221,7 @@ export class WebrtcService {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      await this.flushPendingIceCandidates(payload.stationId, pc);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -241,6 +243,7 @@ export class WebrtcService {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+      await this.flushPendingIceCandidates(payload.senderSocketId, pc);
     } catch {
       return;
     }
@@ -248,22 +251,48 @@ export class WebrtcService {
 
   private async handleWebRtcIceCandidate(payload: WebRtcIceCandidatePayload): Promise<void> {
     const pcViewer = this.viewerPeerConnections.get(payload.stationId);
-    if (pcViewer && pcViewer.remoteDescription) {
-      try {
-        await pcViewer.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      } catch {
-        return;
+    if (pcViewer) {
+      if (pcViewer.remoteDescription) {
+        try {
+          await pcViewer.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } catch {
+          return;
+        }
+      } else {
+        const queue = this.pendingIceCandidates.get(payload.stationId) || [];
+        queue.push(payload.candidate);
+        this.pendingIceCandidates.set(payload.stationId, queue);
       }
       return;
     }
 
     const pcBroadcaster = this.broadcasterPeerConnections.get(payload.senderSocketId);
-    if (pcBroadcaster && pcBroadcaster.remoteDescription) {
-      try {
-        await pcBroadcaster.addIceCandidate(new RTCIceCandidate(payload.candidate));
-      } catch {
-        return;
+    if (pcBroadcaster) {
+      if (pcBroadcaster.remoteDescription) {
+        try {
+          await pcBroadcaster.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } catch {
+          return;
+        }
+      } else {
+        const queue = this.pendingIceCandidates.get(payload.senderSocketId) || [];
+        queue.push(payload.candidate);
+        this.pendingIceCandidates.set(payload.senderSocketId, queue);
       }
+    }
+  }
+
+  private async flushPendingIceCandidates(targetId: string, pc: RTCPeerConnection): Promise<void> {
+    const list = this.pendingIceCandidates.get(targetId);
+    if (list && list.length > 0) {
+      for (const cand of list) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch {
+          continue;
+        }
+      }
+      this.pendingIceCandidates.delete(targetId);
     }
   }
 }

@@ -65,10 +65,18 @@ async function bootstrap(): Promise<void> {
         next();
       }
     });
+  } else {
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
+        res.redirect('/api');
+      } else {
+        next();
+      }
+    });
   }
 
-  await app.listen(port);
-  logger.log(`YOLO Detection API is running on port ${port}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`YOLO Detection API is running on http://localhost:${port}/api (0.0.0.0:${port})`);
 }
 
 bootstrap();

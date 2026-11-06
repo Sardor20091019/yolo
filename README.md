@@ -1,4 +1,4 @@
-# Real-Time AI Shoplifting & Suspicious Behavior Detection System
+# Real-Time YOLO Shoplifting & Suspicious Behavior Detection System
 
 A high-performance full-stack computer vision security and loss prevention monorepo combining **NestJS 10+** (backend), **Angular 19+ with Signals and Tailwind CSS** (frontend), and an **Ultralytics YOLO26m/YOLO11m Pose & ByteTrack Heuristics Engine** (Python worker).
 
@@ -173,7 +173,7 @@ The monorepo is configured for instant, single-project deployment on **Vercel** 
 3. Vercel automatically:
    - Builds the Angular 19 frontend into static edge assets (`apps/web/dist/web/browser`)
    - Deploys the NestJS backend as a serverless API handler (`api/index.ts`)
-   - Executes the native AI heuristics engine for continuous risk scoring without needing background daemon workers
+   - Executes the native YOLO heuristics engine for continuous risk scoring without needing background daemon workers
    - Streams camera frames seamlessly over HTTP (`/api/detection/process-frame`) with real-time HUD rendering
 
 ---

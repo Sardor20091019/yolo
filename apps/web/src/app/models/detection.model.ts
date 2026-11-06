@@ -55,6 +55,9 @@ export interface CctvStationRecord {
   activeDetectionsCount: number;
   lastDetectedObjects: string[];
   lastFrameSnapshot?: string;
+  lastBoxes?: BoundingBox[];
+  lastPoses?: PoseSkeleton[];
+  lastSuspicion?: SuspicionBreakdown[];
 }
 
 export interface DetectionZone {

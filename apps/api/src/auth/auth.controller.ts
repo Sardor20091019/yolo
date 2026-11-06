@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   Req,
+  NotFoundException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -77,9 +78,26 @@ export class AuthController {
     return await this.authService.getAllUsers();
   }
 
+  @Get('db-user/:identifier')
+  public async getDbUser(@Param('identifier') identifier: string): Promise<UserRecord> {
+    const user = await this.authService.getUserByIdOrEmail(identifier);
+    if (!user) {
+      throw new NotFoundException(`User with identifier "${identifier}" not found in database`);
+    }
+    return user;
+  }
+
   @Post('users')
   public async createAuthUser(@Body() dto: { name: string; email?: string }): Promise<UserRecord> {
     return await this.authService.createUser(dto);
+  }
+
+  @Post('role')
+  public async updateRole(
+    @Body() dto: { userId: string; role: 'admin' | 'user' },
+  ): Promise<{ success: boolean; user: UserRecord }> {
+    const updated = await this.authService.updateUserRole(dto.userId, dto.role);
+    return { success: true, user: updated };
   }
 
   @Delete('users/:id')

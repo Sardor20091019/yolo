@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { sql } from 'kysely';
 import { DatabaseService } from '../database/database.service';
@@ -46,6 +46,15 @@ export class AuthService {
       .executeTakeFirst();
   }
 
+  public async getUserByIdOrEmail(identifier: string): Promise<UserRecord | undefined> {
+    const clean = identifier.trim();
+    return await this.databaseService.db
+      .selectFrom('users')
+      .selectAll()
+      .where((eb) => eb.or([eb('id', '=', clean), eb('email', '=', clean)]))
+      .executeTakeFirst();
+  }
+
   public async createUser(dto: { name: string; email?: string }): Promise<UserRecord> {
     const id = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
     return await this.databaseService.db
@@ -55,7 +64,7 @@ export class AuthService {
         name: dto.name,
         email: dto.email || null,
         picture: '',
-        role: 'OPERATOR',
+        role: 'user',
       })
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -69,26 +78,65 @@ export class AuthService {
     return { success: true, id };
   }
 
+  public async updateUserRole(userId: string, role: string): Promise<UserRecord> {
+    const normalizedRole = role.toLowerCase().trim();
+    if (normalizedRole !== 'admin' && normalizedRole !== 'user') {
+      throw new BadRequestException('Role can only be set to user or admin');
+    }
+    return await this.databaseService.db
+      .updateTable('users')
+      .set({
+        role: normalizedRole,
+        updated_at: sql`CURRENT_TIMESTAMP` as unknown as Date,
+      })
+      .where('id', '=', userId)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
   public async saveOrUpdateUser(profile: AuthUserProfile): Promise<UserRecord> {
     const existing = await this.databaseService.db
       .selectFrom('users')
       .selectAll()
-      .where('id', '=', profile.id)
+      .where((eb) =>
+        eb.or([
+          eb('id', '=', profile.id),
+          profile.email ? eb('email', '=', profile.email) : eb('id', '=', profile.id),
+        ]),
+      )
       .executeTakeFirst();
 
     if (existing) {
+      const sanitizedRole = (existing.role?.toLowerCase() === 'admin') ? 'admin' : 'user';
       return await this.databaseService.db
         .updateTable('users')
         .set({
           name: profile.name,
-          email: profile.email,
-          picture: profile.picture,
+          email: profile.email || existing.email,
+          picture: profile.picture || existing.picture,
+          role: sanitizedRole,
           updated_at: sql`CURRENT_TIMESTAMP` as unknown as Date,
         })
-        .where('id', '=', profile.id)
+        .where('id', '=', existing.id)
         .returningAll()
         .executeTakeFirstOrThrow();
     }
+
+    const totalUsers = await this.databaseService.db
+      .selectFrom('users')
+      .select(sql<number>`count(*)::int`.as('count'))
+      .executeTakeFirst();
+
+    const isFirstUser = (totalUsers?.count ?? 0) === 0;
+
+    const adminEmailsConfig = this.configService.get<string>(
+      'auth.adminEmails',
+      'admin@cctv.local,sardor091019@gmail.com,sardor20091019@gmail.com,sardorsunatullayev@gmail.com',
+    );
+    const adminEmails = adminEmailsConfig.split(',').map((e) => e.trim().toLowerCase());
+    const isEmailAdmin = profile.email && adminEmails.includes(profile.email.toLowerCase());
+
+    const assignedRole = (isFirstUser || isEmailAdmin || profile.role?.toLowerCase() === 'admin') ? 'admin' : 'user';
 
     return await this.databaseService.db
       .insertInto('users')
@@ -97,7 +145,7 @@ export class AuthService {
         name: profile.name,
         email: profile.email,
         picture: profile.picture || '',
-        role: profile.role || 'OPERATOR',
+        role: assignedRole,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -120,10 +168,10 @@ export class AuthService {
         const payload = (await response.json()) as Record<string, any>;
         profile = {
           id: payload.sub || `google_${Date.now()}`,
-          email: payload.email || 'operator@cctv.local',
-          name: payload.name || payload.email || 'Admin Operator',
+          email: payload.email || 'user@shoplifting-cctv.local',
+          name: payload.name || payload.email || 'Store User',
           picture: payload.picture || '',
-          role: 'ADMIN',
+          role: 'user',
         };
       }
     } catch {}
@@ -140,10 +188,10 @@ export class AuthService {
           const info = (await userinfoRes.json()) as Record<string, any>;
           profile = {
             id: info.sub || `google_${Date.now()}`,
-            email: info.email || 'operator@cctv.local',
-            name: info.name || info.email || 'Admin Operator',
+            email: info.email || 'user@shoplifting-cctv.local',
+            name: info.name || info.email || 'Store User',
             picture: info.picture || '',
-            role: 'ADMIN',
+            role: 'user',
           };
         }
       } catch {}
@@ -158,10 +206,10 @@ export class AuthService {
           if (decodedPayload.email || decodedPayload.sub) {
             profile = {
               id: decodedPayload.sub || `google_${Date.now()}`,
-              email: decodedPayload.email || 'operator@cctv.local',
-              name: decodedPayload.name || decodedPayload.email || 'Admin Operator',
+              email: decodedPayload.email || 'user@shoplifting-cctv.local',
+              name: decodedPayload.name || decodedPayload.email || 'Store User',
               picture: decodedPayload.picture || '',
-              role: 'ADMIN',
+              role: 'user',
             };
           }
         }

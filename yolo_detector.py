@@ -1,13 +1,13 @@
 import sys
 import os
-os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+os.makedirs('/tmp/yolo_config', exist_ok=True)
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/yolo_config'
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 import base64
 import time
 import math
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Any, Tuple, Optional
 from heuristics_engine import ShopliftingHeuristicsEngine
 
@@ -57,9 +57,9 @@ class YoloShopliftingDetector:
         self.pose_model = None
         self.cv2 = None
         self.np = None
+        self.device = 'cpu'
         self.has_ultralytics = False
         self.simulation_step = 0
-        self.executor = ThreadPoolExecutor(max_workers=2)
 
         self.initialize_models(
             detection_model_path,
@@ -67,10 +67,6 @@ class YoloShopliftingDetector:
             pose_model_path,
             pose_fallback_path
         )
-
-    def __del__(self) -> None:
-        if hasattr(self, 'executor') and self.executor:
-            self.executor.shutdown(wait=False)
 
     def initialize_models(
         self,
@@ -82,10 +78,18 @@ class YoloShopliftingDetector:
         try:
             import cv2
             import numpy as np
+            import torch
             from ultralytics import YOLO
 
             self.cv2 = cv2
             self.np = np
+
+            if torch.backends.mps.is_available():
+                self.device = 'mps'
+            elif torch.cuda.is_available():
+                self.device = 'cuda'
+            else:
+                self.device = 'cpu'
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
             repo_dir = os.path.dirname(base_dir)
@@ -142,7 +146,12 @@ class YoloShopliftingDetector:
 
             if self.detection_model is not None and self.pose_model is not None:
                 self.has_ultralytics = True
-                self.executor = ThreadPoolExecutor(max_workers=2)
+                try:
+                    dummy = np.zeros((360, 640, 3), dtype=np.uint8)
+                    self.detection_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=480)
+                    self.pose_model.predict(source=dummy, conf=0.3, verbose=False, device=self.device, imgsz=480)
+                except Exception:
+                    pass
         except ImportError:
             self.has_ultralytics = False
 
@@ -171,9 +180,24 @@ class YoloShopliftingDetector:
             return self.detection_model.predict(
                 source=image,
                 conf=conf_thresh,
-                verbose=False
+                verbose=False,
+                device=self.device,
+                imgsz=480
             )
-        except Exception:
+        except Exception as exc:
+            sys.stderr.write(f"Detection prediction on {self.device} failed: {exc}\n")
+            if self.device != 'cpu':
+                try:
+                    self.device = 'cpu'
+                    return self.detection_model.predict(
+                        source=image,
+                        conf=conf_thresh,
+                        verbose=False,
+                        device='cpu',
+                        imgsz=480
+                    )
+                except Exception as exc2:
+                    sys.stderr.write(f"Detection fallback to cpu failed: {exc2}\n")
             return []
 
     def predict_pose(self, image: Any, conf_thresh: float) -> List[Any]:
@@ -183,9 +207,24 @@ class YoloShopliftingDetector:
             return self.pose_model.predict(
                 source=image,
                 conf=conf_thresh,
-                verbose=False
+                verbose=False,
+                device=self.device,
+                imgsz=480
             )
-        except Exception:
+        except Exception as exc:
+            sys.stderr.write(f"Pose prediction on {self.device} failed: {exc}\n")
+            if self.device != 'cpu':
+                try:
+                    self.device = 'cpu'
+                    return self.pose_model.predict(
+                        source=image,
+                        conf=conf_thresh,
+                        verbose=False,
+                        device='cpu',
+                        imgsz=480
+                    )
+                except Exception as exc2:
+                    sys.stderr.write(f"Pose fallback to cpu failed: {exc2}\n")
             return []
 
     def overlay_stream_frame(
@@ -340,7 +379,11 @@ class YoloShopliftingDetector:
                         suspicion=result.get('suspicion', []),
                         zones=zones
                     )
-                    result['annotatedFrame'] = annotated
+                    try:
+                        _, buf = self.cv2.imencode('.jpg', annotated, [int(self.cv2.IMWRITE_JPEG_QUALITY), 75])
+                        result['annotatedFrame'] = 'data:image/jpeg;base64,' + base64.b64encode(buf).decode('utf-8')
+                    except Exception:
+                        result['annotatedFrame'] = ''
                 return result
 
         return self.run_optical_simulation(frame_index, zones, calibration, conf_thresh)
@@ -375,11 +418,8 @@ class YoloShopliftingDetector:
         boxes_out: List[Dict[str, Any]] = []
         poses_out: List[Dict[str, Any]] = []
 
-        future_det = self.executor.submit(self.predict_detection, image, conf_thresh)
-        future_pose = self.executor.submit(self.predict_pose, image, conf_thresh)
-
-        det_results = future_det.result()
-        pose_results = future_pose.result()
+        det_results = self.predict_detection(image, conf_thresh)
+        pose_results = self.predict_pose(image, conf_thresh)
 
         for r in det_results:
             boxes = getattr(r, 'boxes', None)

@@ -1,6 +1,7 @@
 import sys
 import os
-os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+os.makedirs('/tmp/yolo_config', exist_ok=True)
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/yolo_config'
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 import json
@@ -25,7 +26,8 @@ def run_ipc_loop(detector: YoloShopliftingDetector) -> None:
                 frame_data=frame_data,
                 frame_index=frame_index,
                 zones=zones,
-                calibration=calibration
+                calibration=calibration,
+                return_annotated=True
             )
 
             response = {
@@ -65,7 +67,8 @@ async def handle_ws_client(websocket, detector: YoloShopliftingDetector) -> None
                 frame_data=frame_data,
                 frame_index=frame_index,
                 zones=zones,
-                calibration=calibration
+                calibration=calibration,
+                return_annotated=True
             )
 
             response = {

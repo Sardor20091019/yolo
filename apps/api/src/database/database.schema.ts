@@ -9,7 +9,7 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
     .addColumn('email', 'varchar(255)')
     .addColumn('name', 'varchar(128)', (col) => col.notNull())
     .addColumn('picture', 'text', (col) => col.notNull().defaultTo(''))
-    .addColumn('role', 'varchar(32)', (col) => col.notNull().defaultTo('OPERATOR'))
+    .addColumn('role', 'varchar(32)', (col) => col.notNull().defaultTo('user'))
     .addColumn('refresh_token_hash', 'text')
     .addColumn('refresh_token_expires_at', 'timestamptz')
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
@@ -92,5 +92,12 @@ export async function initializeDatabaseSchema(db: Kysely<Database>): Promise<vo
       .alterTable('users')
       .addColumn('refresh_token_expires_at', 'timestamptz')
       .execute();
+  } catch {}
+
+  try {
+    await sql`UPDATE users SET role = 'admin' WHERE LOWER(role) = 'admin'`.execute(db);
+    await sql`UPDATE users SET role = 'user' WHERE LOWER(role) NOT IN ('user', 'admin')`.execute(db);
+    await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`.execute(db);
+    await sql`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'admin'))`.execute(db);
   } catch {}
 }

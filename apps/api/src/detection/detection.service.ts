@@ -67,6 +67,17 @@ export interface FrameProcessingResult {
   stationId?: string;
 }
 
+interface PendingWorkerTask {
+  requestId: number;
+  frameIndex: number;
+  payload: Record<string, unknown>;
+  stationId: string;
+  stationName?: string;
+  userId?: string;
+  frameData: string;
+  resolve: (res: FrameProcessingResult) => void;
+}
+
 @Injectable()
 export class DetectionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger: Logger = new Logger(DetectionService.name);
@@ -74,6 +85,9 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
   private pythonRl: readline.Interface | null = null;
   private pendingRequests: Map<number, (result: FrameProcessingResult) => void> = new Map();
   private requestCounter: number = 0;
+  private isWorkerBusy: boolean = false;
+  private nextPendingTask: PendingWorkerTask | null = null;
+  private latestKnownResult: Map<string, FrameProcessingResult> = new Map();
   private activeConfig: StreamConfigDto = {
     mode: 'WEBCAM',
     confidenceThreshold: 0.2,
@@ -100,11 +114,15 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     return stations;
   }
 
+  public isWorkerActive(): boolean {
+    return this.pythonProcess !== null && !this.pythonProcess.killed;
+  }
+
   public registerOrUpdateStation(
     stationId: string,
     stationName?: string,
     frameSnapshot?: string,
-    detectedObjects: string[] = [],
+    detectedObjects?: string[],
   ): void {
     const existing = this.cctvStations.get(stationId);
     const now = Date.now();
@@ -113,8 +131,11 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
       existing.totalFrames++;
       if (stationName) existing.stationName = stationName;
       if (frameSnapshot) existing.lastFrameSnapshot = frameSnapshot;
-      existing.activeDetectionsCount = detectedObjects.length;
-      existing.lastDetectedObjects = detectedObjects;
+      if (detectedObjects !== undefined) {
+        existing.activeDetectionsCount = detectedObjects.length;
+        existing.lastDetectedObjects = detectedObjects;
+      }
+      existing.status = 'STREAMING';
     } else {
       this.cctvStations.set(stationId, {
         stationId,
@@ -123,10 +144,18 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
         lastSeen: now,
         fps: 12,
         totalFrames: 1,
-        activeDetectionsCount: detectedObjects.length,
-        lastDetectedObjects: detectedObjects,
+        activeDetectionsCount: detectedObjects ? detectedObjects.length : 0,
+        lastDetectedObjects: detectedObjects || [],
         lastFrameSnapshot: frameSnapshot,
       });
+    }
+  }
+
+  public removeOrDisconnectStation(stationId: string): void {
+    const existing = this.cctvStations.get(stationId);
+    if (existing) {
+      existing.status = 'DISCONNECTED';
+      existing.lastSeen = Date.now();
     }
   }
 
@@ -209,7 +238,7 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
           ...process.env,
           PYTHONUNBUFFERED: '1',
           PYTHONPATH: workerDir,
-          YOLO_CONFIG_DIR: '/tmp/ultralytics_config',
+          YOLO_CONFIG_DIR: '/tmp/yolo_config',
         },
       });
 
@@ -352,36 +381,39 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (this.pythonProcess && !this.pythonProcess.killed && this.pythonProcess.stdin.writable) {
-      const result = await new Promise<FrameProcessingResult>((resolve) => {
-        const timeout = setTimeout(() => {
-          if (this.pendingRequests.has(requestId)) {
-            this.pendingRequests.delete(requestId);
-            resolve(this.createFallbackResult(frameIndex));
-          }
-        }, 5000);
+      if (this.isWorkerBusy) {
+        if (this.nextPendingTask) {
+          const superseded = this.nextPendingTask;
+          superseded.resolve(this.getCachedOrEmptyResult(superseded.stationId, superseded.frameIndex));
+        }
 
-        this.pendingRequests.set(requestId, (res) => {
-          clearTimeout(timeout);
-          resolve(res);
+        return new Promise<FrameProcessingResult>((resolve) => {
+          this.nextPendingTask = {
+            requestId: ++this.requestCounter,
+            frameIndex,
+            payload,
+            stationId: stationId || 'CCTV-MAIN',
+            stationName,
+            userId,
+            frameData,
+            resolve,
+          };
         });
-
-        this.pythonProcess?.stdin.write(JSON.stringify(payload) + '\n');
-      });
-
-      result.stationId = stationId || 'CCTV-MAIN';
-      if (result.isYoloActive === undefined) {
-        result.isYoloActive = true;
       }
 
-      this.registerOrUpdateStation(
-        stationId || 'CCTV-MAIN',
-        stationName,
-        frameData,
-        result.boxes.map((b) => b.label),
-      );
-      void this.evaluateSuspicionAndTriggerAlerts(result, frameData).catch(() => {});
-      void this.persistAnalyzedDetections(result, stationId, stationName, userId).catch(() => {});
-      return result;
+      this.isWorkerBusy = true;
+      return new Promise<FrameProcessingResult>((resolve) => {
+        this.executeWorkerTask({
+          requestId,
+          frameIndex,
+          payload,
+          stationId: stationId || 'CCTV-MAIN',
+          stationName,
+          userId,
+          frameData,
+          resolve,
+        });
+      });
     }
 
     const fallback = this.createFallbackResult(frameIndex);
@@ -394,6 +426,70 @@ export class DetectionService implements OnModuleInit, OnModuleDestroy {
     await this.evaluateSuspicionAndTriggerAlerts(fallback, frameData);
     await this.persistAnalyzedDetections(fallback, stationId, stationName, userId);
     return fallback;
+  }
+
+  private getCachedOrEmptyResult(stationId: string, frameIndex: number): FrameProcessingResult {
+    const cached = this.latestKnownResult.get(stationId);
+    if (cached) {
+      return {
+        ...cached,
+        frameIndex,
+        timestamp: Date.now(),
+      };
+    }
+    return {
+      frameIndex,
+      timestamp: Date.now(),
+      boxes: [],
+      poses: [],
+      suspicion: [],
+      alertTriggered: false,
+      isYoloActive: true,
+      stationId,
+    };
+  }
+
+  private executeWorkerTask(task: PendingWorkerTask): void {
+    const timeout = setTimeout(() => {
+      if (this.pendingRequests.has(task.requestId)) {
+        this.pendingRequests.delete(task.requestId);
+        task.resolve(this.createFallbackResult(task.frameIndex));
+        this.scheduleNextTaskOrIdle();
+      }
+    }, 8000);
+
+    this.pendingRequests.set(task.requestId, (res: FrameProcessingResult) => {
+      clearTimeout(timeout);
+      res.stationId = task.stationId;
+      if (res.isYoloActive === undefined) {
+        res.isYoloActive = true;
+      }
+      this.latestKnownResult.set(task.stationId, res);
+      this.registerOrUpdateStation(
+        task.stationId,
+        task.stationName,
+        res.annotatedFrame || task.frameData,
+        res.boxes.map((b) => b.label),
+      );
+      void this.evaluateSuspicionAndTriggerAlerts(res, task.frameData).catch(() => {});
+      void this.persistAnalyzedDetections(res, task.stationId, task.stationName, task.userId).catch(() => {});
+      task.resolve(res);
+      this.scheduleNextTaskOrIdle();
+    });
+
+    task.payload['requestId'] = task.requestId;
+    this.pythonProcess?.stdin.write(JSON.stringify(task.payload) + '\n');
+  }
+
+  private scheduleNextTaskOrIdle(): void {
+    if (!this.nextPendingTask) {
+      this.isWorkerBusy = false;
+      return;
+    }
+
+    const next = this.nextPendingTask;
+    this.nextPendingTask = null;
+    this.executeWorkerTask(next);
   }
 
   private pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {

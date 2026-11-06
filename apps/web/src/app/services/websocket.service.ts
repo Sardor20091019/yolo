@@ -85,19 +85,54 @@ export class WebSocketService {
           return;
         }
 
+        const snap = preview['frameSnapshot'] as string | undefined;
+        const boxes = (preview['boxes'] as any[]) || [];
+        const poses = (preview['poses'] as any[]) || [];
+        const suspicion = (preview['suspicion'] as any[]) || [];
+        const detectedLabels = boxes.map((b) => b.label);
+
         this.cctvStations.update((list) => {
           const idx = list.findIndex((s) => s.stationId === stationId);
           if (idx >= 0) {
             const updated = [...list];
             updated[idx] = {
               ...updated[idx],
-              lastFrameSnapshot: (preview['frameSnapshot'] as string) || updated[idx].lastFrameSnapshot,
+              lastFrameSnapshot: snap || updated[idx].lastFrameSnapshot,
               lastSeen: Date.now(),
               status: 'STREAMING',
+              lastDetectedObjects: detectedLabels.length > 0 ? detectedLabels : updated[idx].lastDetectedObjects,
+              activeDetectionsCount: detectedLabels.length > 0 ? detectedLabels.length : updated[idx].activeDetectionsCount,
+              lastBoxes: boxes.length > 0 ? boxes : updated[idx].lastBoxes,
+              lastPoses: poses.length > 0 ? poses : updated[idx].lastPoses,
+              lastSuspicion: suspicion.length > 0 ? suspicion : updated[idx].lastSuspicion,
             };
             return updated;
           }
-          return list;
+          const newStation: CctvStationRecord = {
+            stationId,
+            stationName: (preview['stationName'] as string) || `CCTV Node ${stationId}`,
+            status: 'STREAMING',
+            lastSeen: Date.now(),
+            fps: 12,
+            totalFrames: 1,
+            activeDetectionsCount: detectedLabels.length,
+            lastDetectedObjects: detectedLabels,
+            lastFrameSnapshot: snap || '',
+            lastBoxes: boxes,
+            lastPoses: poses,
+            lastSuspicion: suspicion,
+          };
+          return [...list, newStation];
+        });
+      });
+
+      this.socket.on('station_disconnected', (payload: { stationId: string }) => {
+        const sid = payload?.stationId;
+        if (!sid) {
+          return;
+        }
+        this.cctvStations.update((list) => {
+          return list.map((s) => s.stationId === sid ? { ...s, status: 'DISCONNECTED' } : s);
         });
       });
 
@@ -126,6 +161,14 @@ export class WebSocketService {
       this.socket.emit('register_camera_station', {
         stationId,
         stationName,
+      });
+    }
+  }
+
+  public unregisterCameraNode(stationId: string): void {
+    if (this.socket && this.isConnected()) {
+      this.socket.emit('unregister_camera_station', {
+        stationId,
       });
     }
   }

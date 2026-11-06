@@ -55,6 +55,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   private renderAnimationId: number | null = null;
   private lastBackendTimestamp: number = 0;
   private lastSendTimestamp: number = 0;
+  private lastDetectionReceivedAt: number = 0;
   private isProcessingFrame: boolean = false;
   private sentFrameWidth: number = 640;
   private sentFrameHeight: number = 360;
@@ -79,10 +80,18 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
         const poses = result.poses || [];
         const suspicion = result.suspicion || [];
 
-        this.currentDetections = boxes;
-        this.currentPoses = poses;
-        this.currentSuspicion = suspicion;
-        this.currentDetectionsCount.set(boxes.length);
+        if (boxes.length > 0 || poses.length > 0) {
+          this.currentDetections = boxes;
+          this.currentPoses = poses;
+          this.currentSuspicion = suspicion;
+          this.currentDetectionsCount.set(boxes.length);
+          this.lastDetectionReceivedAt = Date.now();
+        } else if (Date.now() - this.lastDetectionReceivedAt > 700) {
+          this.currentDetections = [];
+          this.currentPoses = [];
+          this.currentSuspicion = [];
+          this.currentDetectionsCount.set(0);
+        }
 
         if (boxes.length > 0) {
           const chips = boxes.map((d) => ({
@@ -91,7 +100,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
           }));
           this.detectedObjectChips.set(chips);
           this.logService.recordDetections(boxes);
-        } else {
+        } else if (Date.now() - this.lastDetectionReceivedAt > 700) {
           this.detectedObjectChips.set([]);
         }
 
@@ -184,6 +193,11 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
   }
 
   public async startStream(): Promise<void> {
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream = null;
+    }
+
     try {
       let stream: MediaStream;
       const constraints: MediaStreamConstraints = {
@@ -216,31 +230,74 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       this.mediaStream = stream;
 
       if (this.videoRef?.nativeElement) {
-        this.videoRef.nativeElement.srcObject = this.mediaStream;
-        await this.videoRef.nativeElement.play();
+        const video = this.videoRef.nativeElement;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.srcObject = this.mediaStream;
+        try {
+          await video.play();
+        } catch (playErr) {
+          console.warn('Video play interrupted:', playErr);
+        }
       }
 
       this.isStreaming.set(true);
+      this.wsService.registerCameraNode(this.stationId(), this.stationName());
       this.webrtcService.startBroadcasting(this.stationId(), this.stationName(), this.mediaStream);
       this.startCaptureInterval();
     } catch (err: unknown) {
       console.error('Camera access failed:', err);
+      this.stopStream();
     }
   }
 
   public stopStream(): void {
-    this.webrtcService.stopBroadcasting();
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
-    if (this.videoRef?.nativeElement) {
-      this.videoRef.nativeElement.srcObject = null;
-    }
+    this.isStreaming.set(false);
+    this.isProcessingFrame = false;
+
     if (this.captureIntervalId) {
       clearInterval(this.captureIntervalId);
       this.captureIntervalId = null;
     }
+
+    this.webrtcService.stopBroadcasting();
+    this.wsService.unregisterCameraNode(this.stationId());
+
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          return;
+        }
+      });
+      this.mediaStream = null;
+    }
+
+    if (this.videoRef?.nativeElement) {
+      const video = this.videoRef.nativeElement;
+      try {
+        video.pause();
+      } catch {
+        return;
+      }
+      try {
+        video.srcObject = null;
+      } catch {
+        return;
+      }
+    }
+
+    if (this.hudCanvasRef?.nativeElement) {
+      const canvas = this.hudCanvasRef.nativeElement;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
     this.currentDetections = [];
     this.currentPoses = [];
     this.currentSuspicion = [];
@@ -248,8 +305,6 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     this.detectedObjectChips.set([]);
     this.activeTheftAlerts.set([]);
     this.highestSuspicionScore.set(0);
-    this.isStreaming.set(false);
-    this.isProcessingFrame = false;
   }
 
   public async toggleCameraFacing(): Promise<void> {
@@ -311,7 +366,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     const now = Date.now();
-    if (this.isProcessingFrame && now - this.lastSendTimestamp < 1500) {
+    if (this.isProcessingFrame && now - this.lastSendTimestamp < 160) {
       return;
     }
 
@@ -342,64 +397,74 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
     }
 
-    hiddenCanvas.width = targetW;
-    hiddenCanvas.height = targetH;
+    if (hiddenCanvas.width !== targetW || hiddenCanvas.height !== targetH) {
+      hiddenCanvas.width = targetW;
+      hiddenCanvas.height = targetH;
+    }
     this.sentFrameWidth = targetW;
     this.sentFrameHeight = targetH;
 
-    ctx.drawImage(video, 0, 0, targetW, targetH);
-    const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.6);
+    try {
+      ctx.drawImage(video, 0, 0, targetW, targetH);
+      const frameBase64 = hiddenCanvas.toDataURL('image/jpeg', 0.6);
 
-    this.frameCounter++;
-    this.framesSinceLastFps++;
-    if (now - this.lastFpsTimestamp >= 1000) {
-      this.fps.set(this.framesSinceLastFps);
-      this.framesSinceLastFps = 0;
-      this.lastFpsTimestamp = now;
+      this.frameCounter++;
+      this.framesSinceLastFps++;
+      if (now - this.lastFpsTimestamp >= 1000) {
+        this.fps.set(this.framesSinceLastFps);
+        this.framesSinceLastFps = 0;
+        this.lastFpsTimestamp = now;
+      }
+
+      this.isProcessingFrame = true;
+      this.lastSendTimestamp = now;
+      this.wsService.sendFrame(
+        frameBase64,
+        this.frameCounter,
+        'WEBCAM',
+        this.currentDetections,
+        this.stationId(),
+        this.stationName(),
+        this.logService.currentUser().id,
+      );
+    } catch {
+      return;
     }
-
-    this.isProcessingFrame = true;
-    this.lastSendTimestamp = now;
-    this.wsService.sendFrame(
-      frameBase64,
-      this.frameCounter,
-      'WEBCAM',
-      this.currentDetections,
-      this.stationId(),
-      this.stationName(),
-      this.logService.currentUser().id,
-    );
   }
 
   private startRenderLoop(): void {
     const loop = (): void => {
-      if (this.isStreaming()) {
-        const video = this.videoRef?.nativeElement;
-        const canvas = this.hudCanvasRef?.nativeElement;
+      try {
+        if (this.isStreaming()) {
+          const video = this.videoRef?.nativeElement;
+          const canvas = this.hudCanvasRef?.nativeElement;
 
-        if (video && canvas && video.readyState >= 2) {
-          const vWidth = video.videoWidth || 1280;
-          const vHeight = video.videoHeight || 720;
+          if (video && canvas && video.readyState >= 2) {
+            const vWidth = video.videoWidth || 1280;
+            const vHeight = video.videoHeight || 720;
 
-          if (canvas.width !== vWidth || canvas.height !== vHeight) {
-            canvas.width = vWidth;
-            canvas.height = vHeight;
-          }
+            if (vWidth > 0 && vHeight > 0 && (canvas.width !== vWidth || canvas.height !== vHeight)) {
+              canvas.width = vWidth;
+              canvas.height = vHeight;
+            }
 
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const posesToRender = this.currentPoses;
-            const boxesToRender = this.currentDetections;
+              const posesToRender = this.currentPoses;
+              const boxesToRender = this.currentDetections;
 
-            const scaleX = canvas.width / (this.sentFrameWidth || canvas.width);
-            const scaleY = canvas.height / (this.sentFrameHeight || canvas.height);
+              const scaleX = canvas.width / (this.sentFrameWidth || canvas.width);
+              const scaleY = canvas.height / (this.sentFrameHeight || canvas.height);
 
-            this.renderPoses(ctx, posesToRender, scaleX, scaleY);
-            this.renderBoxes(ctx, boxesToRender, scaleX, scaleY);
+              this.renderPoses(ctx, posesToRender, scaleX, scaleY);
+              this.renderBoxes(ctx, boxesToRender, scaleX, scaleY);
+            }
           }
         }
+      } catch {
+        return;
       }
       this.renderAnimationId = requestAnimationFrame(loop);
     };
@@ -412,6 +477,9 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     poses.forEach((pose) => {
+      if (!pose || !pose.keypoints) {
+        return;
+      }
       const kps = pose.keypoints;
       if (!kps || kps.length === 0) {
         return;
@@ -436,7 +504,7 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
       }
 
       kps.forEach((kp) => {
-        if (kp.confidence >= 0.2 && kp.x > 0 && kp.y > 0) {
+        if (kp && kp.confidence >= 0.2 && kp.x > 0 && kp.y > 0) {
           const sx = kp.x * scaleX;
           const sy = kp.y * scaleY;
 
@@ -461,9 +529,16 @@ export class CameraStreamComponent implements OnInit, OnDestroy {
     }
 
     const suspicionMap = new Map<number, SuspicionBreakdown>();
-    this.currentSuspicion.forEach((s) => suspicionMap.set(s.trackId, s));
+    this.currentSuspicion.forEach((s) => {
+      if (s && s.trackId !== undefined) {
+        suspicionMap.set(s.trackId, s);
+      }
+    });
 
     boxes.forEach((box) => {
+      if (!box || !box.bbox || box.bbox.length < 4) {
+        return;
+      }
       const rawBbox = box.bbox;
       const x1 = rawBbox[0] * scaleX;
       const y1 = rawBbox[1] * scaleY;

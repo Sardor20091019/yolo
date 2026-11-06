@@ -78,6 +78,7 @@ export class DetectionLogService {
 
   private lastRecordedTimeByLabel: Map<string, number> = new Map<string, number>();
   private lastDbPostTimestamp: number = 0;
+  private lastLogsSetTimestamp: number = 0;
 
   constructor(private readonly http: HttpClient) {
     this.apiBaseUrl = getApiBaseUrl();
@@ -272,7 +273,8 @@ export class DetectionLogService {
       }
     });
 
-    if (hasModifications) {
+    if (hasModifications && (now - this.lastLogsSetTimestamp >= 1000)) {
+      this.lastLogsSetTimestamp = now;
       if (currentLogs.length > 250) {
         currentLogs = currentLogs.slice(0, 250);
       }

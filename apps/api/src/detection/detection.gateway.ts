@@ -101,6 +101,21 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
     client.emit('camera_registered', { stationId: payload.stationId, stationName: name });
   }
 
+  @SubscribeMessage('unregister_camera_station')
+  public handleUnregisterCameraStation(
+    @MessageBody() payload: { stationId: string },
+    @ConnectedSocket() client: Socket,
+  ): void {
+    if (!payload?.stationId) {
+      return;
+    }
+    this.detectionService.removeOrDisconnectStation(payload.stationId);
+    this.cameraSockets.delete(payload.stationId);
+    this.socketToStation.delete(client.id);
+    this.broadcastStationsList();
+    this.server.emit('station_disconnected', { stationId: payload.stationId });
+  }
+
   @SubscribeMessage('admin_join_cctv')
   public handleAdminJoinCctv(@ConnectedSocket() client: Socket): void {
     this.adminSockets.add(client.id);
@@ -189,6 +204,13 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
+    if (payload.stationId) {
+      this.detectionService.registerOrUpdateStation(
+        payload.stationId,
+        payload.stationName,
+      );
+    }
+
     const result: FrameProcessingResult = await this.detectionService.processFrame(
       payload.frameData,
       payload.frameIndex || 0,
@@ -205,7 +227,7 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.server.emit('station_frame_preview', {
         stationId: payload.stationId,
         stationName: payload.stationName,
-        frameSnapshot: payload.frameData,
+        frameSnapshot: result.annotatedFrame || payload.frameData,
         boxes: result.boxes,
         poses: result.poses,
         suspicion: result.suspicion,

@@ -26,13 +26,7 @@ export class AuthService {
   private readonly REFRESH_TOKEN_KEY: string = 'astro_cctv_refresh_token';
   private readonly apiBaseUrl: string;
 
-  public readonly currentUser: WritableSignal<UserSession | null> = signal<UserSession | null>({
-    id: 'usr_cctv_default',
-    email: 'user@shoplifting-cctv.local',
-    name: 'Camera Operator',
-    picture: '',
-    role: 'user',
-  });
+  public readonly currentUser: WritableSignal<UserSession | null> = signal<UserSession | null>(null);
   public readonly accessToken: WritableSignal<string | null> = signal<string | null>(null);
   public readonly refreshToken: WritableSignal<string | null> = signal<string | null>(null);
   public readonly googleClientId: WritableSignal<string> = signal<string>(
@@ -47,31 +41,9 @@ export class AuthService {
   });
 
   public readonly isAdmin: Signal<boolean> = computed(() => {
-    return this.currentUser()?.role === 'admin';
+    const role = (this.currentUser()?.role || '').toLowerCase();
+    return role === 'admin';
   });
-
-  public setRole(role: 'user' | 'admin'): void {
-    const current = this.currentUser();
-    const updated: UserSession = {
-      id: current?.id || 'usr_cctv_default',
-      email: current?.email || (role === 'admin' ? 'admin@shoplifting-cctv.local' : 'user@shoplifting-cctv.local'),
-      name: role === 'admin' ? 'Security Admin' : 'Camera Operator',
-      picture: current?.picture || '',
-      role,
-    };
-    this.currentUser.set(updated);
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        return;
-      }
-    }
-  }
-
-  public toggleRole(): void {
-    this.setRole(this.isAdmin() ? 'user' : 'admin');
-  }
 
   constructor(private readonly http: HttpClient) {
     this.apiBaseUrl = getApiBaseUrl();
@@ -79,6 +51,77 @@ export class AuthService {
     this.restoreSession();
     this.checkForOAuthRedirectToken();
     this.fetchGoogleConfig();
+  }
+
+  public refreshRoleFromDb(identifier?: string): void {
+    const id = identifier || this.currentUser()?.email || this.currentUser()?.id;
+    if (!id) {
+      return;
+    }
+    this.http
+      .get<{ id: string; email: string | null; name: string; role: string; picture: string }>(
+        `${this.apiBaseUrl}/auth/db-user/${encodeURIComponent(id)}`,
+      )
+      .subscribe({
+        next: (dbUser) => {
+          if (dbUser && dbUser.role) {
+            const cleanRole = dbUser.role.toLowerCase() === 'admin' ? 'admin' : 'user';
+            const current = this.currentUser();
+            const updated: UserSession = {
+              id: dbUser.id || current?.id || id,
+              email: dbUser.email || current?.email || '',
+              name: dbUser.name || current?.name || 'User',
+              picture: dbUser.picture || current?.picture || '',
+              role: cleanRole,
+            };
+            this.currentUser.set(updated);
+            if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
+            }
+          }
+        },
+        error: () => {},
+      });
+  }
+
+  public refreshProfile(): void {
+    const token = this.accessToken();
+    if (!token) {
+      const current = this.currentUser();
+      if (current) {
+        this.refreshRoleFromDb(current.email || current.id);
+      }
+      return;
+    }
+    this.http
+      .get<{ user?: { id: string; email: string | null; name: string; picture: string; role: string } }>(
+        `${this.apiBaseUrl}/auth/me`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      .subscribe({
+        next: (res) => {
+          if (res && res.user) {
+            const cleanRole = (res.user.role || 'user').toLowerCase() === 'admin' ? 'admin' : 'user';
+            const userSession: UserSession = {
+              id: res.user.id,
+              email: res.user.email || '',
+              name: res.user.name,
+              picture: res.user.picture || '',
+              role: cleanRole,
+            };
+            this.currentUser.set(userSession);
+            if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.setItem(this.STORAGE_KEY, JSON.stringify(userSession));
+            }
+          }
+        },
+        error: () => {
+          const current = this.currentUser();
+          if (current) {
+            this.refreshRoleFromDb(current.email || current.id);
+          }
+        },
+      });
   }
 
   private restoreSession(): void {
@@ -90,18 +133,12 @@ export class AuthService {
       if (stored) {
         const user: UserSession = JSON.parse(stored);
         this.currentUser.set(user);
-      } else {
-        this.currentUser.set({
-          id: 'usr_cctv_default',
-          email: 'user@shoplifting-cctv.local',
-          name: 'Camera Operator',
-          picture: '',
-          role: 'user',
-        });
+        this.refreshRoleFromDb(user.email || user.id);
       }
       const aToken = localStorage.getItem(this.ACCESS_TOKEN_KEY);
       if (aToken) {
         this.accessToken.set(aToken);
+        this.refreshProfile();
       }
       const rToken = localStorage.getItem(this.REFRESH_TOKEN_KEY);
       if (rToken) {
@@ -144,10 +181,10 @@ export class AuthService {
           if (payload && (payload.email || payload.sub)) {
             const immediateUser: UserSession = {
               id: payload.sub || `google_${Date.now()}`,
-              email: payload.email || 'operator@cctv.local',
-              name: payload.name || payload.email || 'Admin Operator',
+              email: payload.email || 'user@shoplifting-cctv.local',
+              name: payload.name || payload.email || 'Store User',
               picture: payload.picture || '',
-              role: 'OPERATOR',
+              role: 'user',
             };
             this.setUserSession(immediateUser, token, token);
           }
@@ -164,6 +201,7 @@ export class AuthService {
               res.accessToken || res.token || token,
               res.refreshToken || '',
             );
+            this.refreshRoleFromDb(res.user.email || res.user.id);
           }
         },
         error: () => {
@@ -206,38 +244,6 @@ export class AuthService {
     this.redirectToGoogleOAuth();
   }
 
-  public loginWithIdentifier(identifier: string): Observable<boolean> {
-    const cleanId = identifier.trim();
-    if (!cleanId) {
-      this.authErrorMessage.set('Please enter a username or email.');
-      return of(false);
-    }
-
-    this.isAuthenticating.set(true);
-    this.authErrorMessage.set('');
-
-    return this.http
-      .post<{ user: UserSession; accessToken: string; refreshToken: string }>(
-        `${this.apiBaseUrl}/auth/login`,
-        { identifier: cleanId },
-      )
-      .pipe(
-        tap((res) => {
-          this.isAuthenticating.set(false);
-          if (res && res.user && res.accessToken) {
-            this.setUserSession(res.user, res.accessToken, res.refreshToken);
-            this.isAuthModalOpen.set(false);
-          }
-        }),
-        map(() => true),
-        catchError((err) => {
-          this.isAuthenticating.set(false);
-          this.authErrorMessage.set(err?.error?.message || 'Login failed. Please check your credentials.');
-          return of(false);
-        }),
-      );
-  }
-
   public verifyGoogleCredentialOnBackend(
     credential: string,
   ): Observable<{ user: UserSession; accessToken?: string; refreshToken?: string; token?: string }> {
@@ -255,6 +261,7 @@ export class AuthService {
               res.refreshToken || '',
             );
             this.isAuthModalOpen.set(false);
+            this.refreshRoleFromDb(res.user.email || res.user.id);
           }
         }),
       );
@@ -303,11 +310,15 @@ export class AuthService {
   }
 
   private setUserSession(user: UserSession, accessToken: string, refreshToken: string): void {
-    this.currentUser.set(user);
+    const normalizedUser: UserSession = {
+      ...user,
+      role: (user.role || 'user').toLowerCase(),
+    };
+    this.currentUser.set(normalizedUser);
     this.accessToken.set(accessToken);
     this.refreshToken.set(refreshToken);
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(normalizedUser));
       if (accessToken) {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
       }
