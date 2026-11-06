@@ -9,8 +9,8 @@ export function getBackendBaseUrl(): string {
       const host = window.location.hostname || 'localhost';
       return `http://${host}:3000`;
     }
-    if (window.location.origin && window.location.origin !== 'null') {
-      return window.location.origin;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:3000';
     }
   }
   return 'https://yolo-zt3r.onrender.com';
@@ -23,4 +23,3 @@ export function getApiBaseUrl(): string {
 export function getSocketUrl(): string {
   return getBackendBaseUrl();
 }
-

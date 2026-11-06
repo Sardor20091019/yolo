@@ -20,9 +20,27 @@ async function bootstrap(): Promise<void> {
       ? path.resolve(process.cwd(), '../..', rawUploadsDir)
       : path.resolve(process.cwd(), rawUploadsDir);
 
+  const rawCorsOrigin = configService.get<string>('corsOrigin', 'http://localhost:4200');
+  const allowedOrigins = rawCorsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+
   app.enableCors({
-    origin: (_origin, callback) => {
-      callback(null, true);
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      const isExplicitMatch = allowedOrigins.some((allowed) => {
+        if (allowed.startsWith('*.')) {
+          return origin.endsWith(allowed.slice(2));
+        }
+        return allowed === origin;
+      });
+      if (isExplicitMatch || /^https:\/\/.*\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
     },
     credentials: true,
   });
