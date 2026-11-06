@@ -1,4 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "apps/web"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:match*",
@@ -7,6 +13,12 @@
     {
       "source": "/uploads/:match*",
       "destination": "https://yolo-zt3r.onrender.com/uploads/:match*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "web"
+      }
     }
   ]
 }
