@@ -166,13 +166,18 @@ export class AuthService {
 
       if (response.ok) {
         const payload = (await response.json()) as Record<string, any>;
-        profile = {
-          id: payload.sub || `google_${Date.now()}`,
-          email: payload.email || 'user@shoplifting-cctv.local',
-          name: payload.name || payload.email || 'Store User',
-          picture: payload.picture || '',
-          role: 'user',
-        };
+        if (this.googleClientId && payload.aud && payload.aud !== this.googleClientId) {
+          throw new UnauthorizedException('Google token audience mismatch');
+        }
+        if (payload.email && payload.sub) {
+          profile = {
+            id: payload.sub,
+            email: payload.email,
+            name: payload.name || payload.email || 'Store User',
+            picture: payload.picture || '',
+            role: 'user',
+          };
+        }
       }
     } catch {}
 
@@ -186,40 +191,21 @@ export class AuthService {
 
         if (userinfoRes.ok) {
           const info = (await userinfoRes.json()) as Record<string, any>;
-          profile = {
-            id: info.sub || `google_${Date.now()}`,
-            email: info.email || 'user@shoplifting-cctv.local',
-            name: info.name || info.email || 'Store User',
-            picture: info.picture || '',
-            role: 'user',
-          };
+          if (info.email && info.sub) {
+            profile = {
+              id: info.sub,
+              email: info.email,
+              name: info.name || info.email || 'Store User',
+              picture: info.picture || '',
+              role: 'user',
+            };
+          }
         }
       } catch {}
     }
 
     if (!profile) {
-      try {
-        const parts = credential.split('.');
-        if (parts.length === 3) {
-          const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf-8');
-          const decodedPayload = JSON.parse(payloadJson);
-          if (decodedPayload.email || decodedPayload.sub) {
-            profile = {
-              id: decodedPayload.sub || `google_${Date.now()}`,
-              email: decodedPayload.email || 'user@shoplifting-cctv.local',
-              name: decodedPayload.name || decodedPayload.email || 'Store User',
-              picture: decodedPayload.picture || '',
-              role: 'user',
-            };
-          }
-        }
-      } catch {
-        throw new UnauthorizedException('Invalid Google token format');
-      }
-    }
-
-    if (!profile) {
-      throw new UnauthorizedException('Failed to authenticate Google identity');
+      throw new UnauthorizedException('Cryptographic verification failed for Google identity token');
     }
 
     const saved = await this.saveOrUpdateUser(profile);
@@ -241,6 +227,15 @@ export class AuthService {
     const cleanId = dto.identifier.trim();
     if (!cleanId) {
       throw new UnauthorizedException('Identifier is required');
+    }
+
+    const configuredSecret = this.configService.get<string>('auth.devSecret') || process.env.ADMIN_PASSWORD;
+    if (configuredSecret && (!dto.password || dto.password !== configuredSecret)) {
+      throw new UnauthorizedException('Invalid login credentials');
+    }
+
+    if (!configuredSecret && process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedException('Direct identifier login is disabled in production. Authenticate via Google OAuth.');
     }
 
     let user = await this.databaseService.db

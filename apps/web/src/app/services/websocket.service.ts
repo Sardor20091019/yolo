@@ -39,6 +39,7 @@ export class WebSocketService {
     }
 
     const socketUrl = getSocketUrl();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('astro_cctv_access_token') : null;
 
     try {
       this.socket = io(socketUrl, {
@@ -46,6 +47,7 @@ export class WebSocketService {
         reconnectionAttempts: 15,
         reconnectionDelay: 1500,
         timeout: 10000,
+        auth: token ? { token } : undefined,
       });
 
       this.webrtcService.initSignaling(this.socket);

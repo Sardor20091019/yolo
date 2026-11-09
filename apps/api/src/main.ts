@@ -28,30 +28,30 @@ async function bootstrap(): Promise<void> {
       if (!origin) {
         return callback(null, true);
       }
-      if (allowedOrigins.includes('*')) {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      const isExplicitMatch = allowedOrigins.some((allowed) => {
+      const isAllowedWildcard = allowedOrigins.some((allowed) => {
         if (allowed.startsWith('*.')) {
-          return origin.endsWith(allowed.slice(2));
+          const suffix = allowed.slice(1);
+          return origin.endsWith(suffix);
         }
-        return allowed === origin;
+        return false;
       });
-      if (
-        isExplicitMatch ||
-        origin.endsWith('.vercel.app') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1')
-      ) {
+      if (isAllowedWildcard) {
         return callback(null, true);
       }
-      return callback(null, false);
+      const isDevLoopback = process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (isDevLoopback) {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS request rejected by origin policy'), false);
     },
     credentials: true,
   });
 
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   app.setGlobalPrefix('api');
 

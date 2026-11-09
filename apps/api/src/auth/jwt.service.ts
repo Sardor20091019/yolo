@@ -11,14 +11,17 @@ export class JwtSecurityService {
   private readonly refreshExpiresInSeconds: number;
 
   constructor(private readonly configService: ConfigService) {
-    this.accessSecret = this.configService.get<string>(
-      'jwt.accessSecret',
-      'astro_cctv_access_secret_key_prod_32chars!',
-    );
-    this.refreshSecret = this.configService.get<string>(
-      'jwt.refreshSecret',
-      'astro_cctv_refresh_secret_key_prod_32chars!',
-    );
+    const configuredAccess = this.configService.get<string>('jwt.accessSecret');
+    const configuredRefresh = this.configService.get<string>('jwt.refreshSecret');
+
+    this.accessSecret = configuredAccess && configuredAccess.trim().length >= 16
+      ? configuredAccess.trim()
+      : crypto.randomBytes(32).toString('hex');
+
+    this.refreshSecret = configuredRefresh && configuredRefresh.trim().length >= 16
+      ? configuredRefresh.trim()
+      : crypto.randomBytes(32).toString('hex');
+
     this.accessExpiresInSeconds = this.configService.get<number>('jwt.accessExpiresInSeconds', 900);
     this.refreshExpiresInSeconds = this.configService.get<number>('jwt.refreshExpiresInSeconds', 604800);
   }

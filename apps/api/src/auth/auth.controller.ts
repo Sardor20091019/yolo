@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
@@ -74,54 +75,105 @@ export class AuthController {
   }
 
   @Get('users')
-  public async getAuthUsers(): Promise<UserRecord[]> {
+  @UseGuards(JwtAuthGuard)
+  public async getAuthUsers(
+    @CurrentUser() user: JwtTokenPayload,
+  ): Promise<UserRecord[]> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.getAllUsers();
   }
 
   @Get('db-user/:identifier')
-  public async getDbUser(@Param('identifier') identifier: string): Promise<UserRecord> {
-    const user = await this.authService.getUserByIdOrEmail(identifier);
-    if (!user) {
+  @UseGuards(JwtAuthGuard)
+  public async getDbUser(
+    @CurrentUser() user: JwtTokenPayload,
+    @Param('identifier') identifier: string,
+  ): Promise<UserRecord> {
+    const isOwner = user.sub === identifier || user.email === identifier;
+    if (user.role !== 'admin' && !isOwner) {
+      throw new UnauthorizedException('Access denied');
+    }
+    const foundUser = await this.authService.getUserByIdOrEmail(identifier);
+    if (!foundUser) {
       throw new NotFoundException(`User with identifier "${identifier}" not found in database`);
     }
-    return user;
+    return foundUser;
   }
 
   @Post('users')
-  public async createAuthUser(@Body() dto: { name: string; email?: string }): Promise<UserRecord> {
+  @UseGuards(JwtAuthGuard)
+  public async createAuthUser(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() dto: { name: string; email?: string },
+  ): Promise<UserRecord> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.createUser(dto);
   }
 
   @Post('role')
+  @UseGuards(JwtAuthGuard)
   public async updateRole(
+    @CurrentUser() user: JwtTokenPayload,
     @Body() dto: { userId: string; role: 'admin' | 'user' },
   ): Promise<{ success: boolean; user: UserRecord }> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     const updated = await this.authService.updateUserRole(dto.userId, dto.role);
     return { success: true, user: updated };
   }
 
   @Delete('users/:id')
-  public async deleteAuthUser(@Param('id') id: string): Promise<{ success: boolean; id: string }> {
+  @UseGuards(JwtAuthGuard)
+  public async deleteAuthUser(
+    @CurrentUser() user: JwtTokenPayload,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; id: string }> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.deleteUser(id);
   }
 }
 
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly authService: AuthService) {}
 
   @Get()
-  public async getAllUsers(): Promise<UserRecord[]> {
+  public async getAllUsers(
+    @CurrentUser() user: JwtTokenPayload,
+  ): Promise<UserRecord[]> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.getAllUsers();
   }
 
   @Post()
-  public async createUser(@Body() dto: { name: string; email?: string }): Promise<UserRecord> {
+  public async createUser(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() dto: { name: string; email?: string },
+  ): Promise<UserRecord> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.createUser(dto);
   }
 
   @Delete(':id')
-  public async deleteUser(@Param('id') id: string): Promise<{ success: boolean; id: string }> {
+  public async deleteUser(
+    @CurrentUser() user: JwtTokenPayload,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; id: string }> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.authService.deleteUser(id);
   }
 }

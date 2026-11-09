@@ -11,6 +11,8 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { DetectionService, FrameProcessingResult } from './detection.service';
 import { StreamConfigDto } from './dto/stream-config.dto';
+import { JwtSecurityService } from '../auth/jwt.service';
+import { JwtTokenPayload } from '../auth/auth.dto';
 
 interface StreamFramePayload {
   frameData: string;
@@ -61,10 +63,31 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly socketToStation: Map<string, string> = new Map();
   private readonly adminSockets: Set<string> = new Set();
 
-  constructor(private readonly detectionService: DetectionService) {}
+  constructor(
+    private readonly detectionService: DetectionService,
+    private readonly jwtSecurityService: JwtSecurityService,
+  ) {}
 
   public handleConnection(client: Socket): void {
-    this.logger.log(`Client connected to DetectionGateway: ${client.id}`);
+    const rawToken =
+      client.handshake.auth?.token ||
+      (typeof client.handshake.headers?.authorization === 'string'
+        ? client.handshake.headers.authorization.replace('Bearer ', '').trim()
+        : '') ||
+      client.handshake.query?.token;
+
+    if (rawToken && typeof rawToken === 'string') {
+      try {
+        const claims: JwtTokenPayload = this.jwtSecurityService.verifyAccessToken(rawToken);
+        client.data.user = claims;
+        this.logger.log(`Authenticated client connected to DetectionGateway: ${client.id} (User: ${claims.sub}, Role: ${claims.role})`);
+      } catch {
+        client.data.user = null;
+      }
+    } else {
+      client.data.user = null;
+    }
+
     const currentConfig = this.detectionService.getConfig();
     client.emit('calibration_updated', currentConfig);
   }
@@ -78,7 +101,9 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.socketToStation.delete(client.id);
       this.cameraSockets.delete(stationId);
       this.broadcastStationsList();
-      this.server.emit('station_disconnected', { stationId });
+      for (const adminId of this.adminSockets) {
+        this.server.to(adminId).emit('station_disconnected', { stationId });
+      }
     }
   }
 
@@ -116,11 +141,19 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.cameraSockets.delete(payload.stationId);
     this.socketToStation.delete(client.id);
     this.broadcastStationsList();
-    this.server.emit('station_disconnected', { stationId: payload.stationId });
+    for (const adminId of this.adminSockets) {
+      this.server.to(adminId).emit('station_disconnected', { stationId: payload.stationId });
+    }
   }
 
   @SubscribeMessage('admin_join_cctv')
   public handleAdminJoinCctv(@ConnectedSocket() client: Socket): void {
+    const user = client.data?.user as JwtTokenPayload | null;
+    if (user && user.role !== 'admin') {
+      client.emit('auth_error', { message: 'Administrative privileges required to monitor CCTV stream' });
+      return;
+    }
+
     this.adminSockets.add(client.id);
     const stations = this.detectionService.getAllCctvStations();
     client.emit('cctv_stations_updated', stations);
@@ -207,6 +240,8 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
+    const senderUserId = (client.data?.user as JwtTokenPayload | null)?.sub || payload.userId;
+
     if (payload.stationId) {
       this.detectionService.registerOrUpdateStation(
         payload.stationId,
@@ -221,13 +256,13 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
       payload.detectedBoxes,
       payload.stationId,
       payload.stationName,
-      payload.userId,
+      senderUserId,
     );
 
     client.emit('detection_results', result);
 
     if (payload.stationId) {
-      this.server.emit('station_frame_preview', {
+      const previewPayload = {
         stationId: payload.stationId,
         stationName: payload.stationName,
         frameSnapshot: result.annotatedFrame || payload.frameData,
@@ -237,24 +272,39 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
         alertTriggered: result.alertTriggered,
         isYoloActive: result.isYoloActive,
         engineError: result.engineError,
-      });
+      };
+
+      for (const adminId of this.adminSockets) {
+        this.server.to(adminId).emit('station_frame_preview', previewPayload);
+      }
     }
 
     if (result.alertTriggered) {
-      this.server.emit('realtime_alert', {
+      const alertPayload = {
         stationId: payload.stationId,
         stationName: payload.stationName,
         frameIndex: result.frameIndex,
         timestamp: result.timestamp,
         suspicion: result.suspicion.filter((s) => s.score >= 50),
-      });
+      };
+
+      for (const adminId of this.adminSockets) {
+        this.server.to(adminId).emit('realtime_alert', alertPayload);
+      }
     }
   }
 
   @SubscribeMessage('update_calibration')
   public handleUpdateCalibration(
+    @ConnectedSocket() client: Socket,
     @MessageBody() payload: StreamConfigDto,
   ): StreamConfigDto {
+    const user = client.data?.user as JwtTokenPayload | null;
+    if (user && user.role !== 'admin') {
+      client.emit('auth_error', { message: 'Administrative privileges required to update calibration' });
+      return this.detectionService.getConfig();
+    }
+
     const updated = this.detectionService.updateConfig(payload);
     this.server.emit('calibration_updated', updated);
     return updated;
@@ -262,6 +312,8 @@ export class DetectionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private broadcastStationsList(): void {
     const stations = this.detectionService.getAllCctvStations();
-    this.server.emit('cctv_stations_updated', stations);
+    for (const adminId of this.adminSockets) {
+      this.server.to(adminId).emit('cctv_stations_updated', stations);
+    }
   }
 }

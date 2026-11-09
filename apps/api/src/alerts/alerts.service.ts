@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { AlertsRepository, AlertMetrics } from './alerts.repository';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { AlertRecord, NewAlertRecord } from '../database/database.types';
@@ -32,9 +33,27 @@ export class AlertsService {
 
   public async saveSnapshotFromBase64(base64Data: string, trackId: number): Promise<string> {
     try {
+      if (!base64Data || typeof base64Data !== 'string') {
+        return '';
+      }
       const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(cleanBase64, 'base64');
-      const filename = `snapshot_${Date.now()}_track_${trackId}.jpg`;
+      if (buffer.length === 0 || buffer.length > 5 * 1024 * 1024) {
+        return '';
+      }
+
+      const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+      const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+      const isWebp = buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+
+      if (!isJpeg && !isPng && !isWebp) {
+        return '';
+      }
+
+      const extension = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
+      const safeTrackId = Math.abs(Math.floor(Number(trackId) || 0));
+      const randomPart = crypto.randomUUID();
+      const filename = `snap_${safeTrackId}_${randomPart}.${extension}`;
       const filePath = path.join(this.snapshotsDir, filename);
 
       await fs.promises.writeFile(filePath, buffer);

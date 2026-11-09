@@ -19,10 +19,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Database connection URL is missing in ConfigService.');
     }
 
+    const requiresSsl = databaseUrl.includes('sslmode=require') || databaseUrl.includes('ssl=true');
     this.pool = new Pool({
       connectionString: databaseUrl,
       max: 10,
-      ssl: databaseUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+      ssl: requiresSsl
+        ? { rejectUnauthorized: !databaseUrl.includes('rejectUnauthorized=false') }
+        : undefined,
     });
 
     this.kyselyDb = new Kysely<Database>({

@@ -1,11 +1,28 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DetectionService, FrameProcessingResult } from './detection.service';
 import { CreateDetectionZoneDto, UpdateDetectionZoneDto } from './dto/detection-zone.dto';
 import { StreamConfigDto } from './dto/stream-config.dto';
 import { FrameDetectionDto } from './dto/frame-detection.dto';
 import { DetectionZoneRecord, DetectionLogRecord, NewDetectionLogRecord } from '../database/database.types';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtTokenPayload } from '../auth/auth.dto';
 
 @Controller('detection')
+@UseGuards(JwtAuthGuard)
 export class DetectionController {
   constructor(private readonly detectionService: DetectionService) {}
 
@@ -16,13 +33,22 @@ export class DetectionController {
 
   @Post('config')
   @HttpCode(HttpStatus.OK)
-  public updateConfig(@Body() configDto: StreamConfigDto): StreamConfigDto {
+  public updateConfig(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() configDto: StreamConfigDto,
+  ): StreamConfigDto {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return this.detectionService.updateConfig(configDto);
   }
 
   @Post('process-frame')
   @HttpCode(HttpStatus.OK)
-  public async processFrame(@Body() frameDto: FrameDetectionDto): Promise<FrameProcessingResult> {
+  public async processFrame(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() frameDto: FrameDetectionDto,
+  ): Promise<FrameProcessingResult> {
     return await this.detectionService.processFrame(
       frameDto.frameData,
       frameDto.frameIndex,
@@ -30,7 +56,7 @@ export class DetectionController {
       frameDto.detectedBoxes,
       frameDto.stationId,
       frameDto.stationName,
-      frameDto.userId,
+      user.sub || frameDto.userId,
     );
   }
 
@@ -49,15 +75,28 @@ export class DetectionController {
   }
 
   @Delete('logs')
-  public async deleteDetectionLogs(@Query('userId') userId?: string): Promise<{ success: boolean }> {
+  public async deleteDetectionLogs(
+    @CurrentUser() user: JwtTokenPayload,
+    @Query('userId') userId?: string,
+  ): Promise<{ success: boolean }> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     const success = await this.detectionService.deleteDetectionLogs(userId);
     return { success };
   }
 
   @Post('logs')
   @HttpCode(HttpStatus.CREATED)
-  public async createDetectionLogs(@Body() logs: NewDetectionLogRecord[]): Promise<DetectionLogRecord[]> {
-    return await this.detectionService.saveDetectionLogsBatch(logs);
+  public async createDetectionLogs(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() logs: NewDetectionLogRecord[],
+  ): Promise<DetectionLogRecord[]> {
+    const stampedLogs = logs.map((log) => ({
+      ...log,
+      user_id: user.sub || log.user_id,
+    }));
+    return await this.detectionService.saveDetectionLogsBatch(stampedLogs);
   }
 
   @Get('zones')
@@ -67,20 +106,36 @@ export class DetectionController {
 
   @Post('zones')
   @HttpCode(HttpStatus.CREATED)
-  public async createZone(@Body() dto: CreateDetectionZoneDto): Promise<DetectionZoneRecord> {
+  public async createZone(
+    @CurrentUser() user: JwtTokenPayload,
+    @Body() dto: CreateDetectionZoneDto,
+  ): Promise<DetectionZoneRecord> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.detectionService.createZone(dto);
   }
 
   @Patch('zones/:id')
   public async updateZone(
+    @CurrentUser() user: JwtTokenPayload,
     @Param('id') id: string,
     @Body() dto: UpdateDetectionZoneDto,
   ): Promise<DetectionZoneRecord> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.detectionService.updateZone(id, dto);
   }
 
   @Delete('zones/:id')
-  public async deleteZone(@Param('id') id: string): Promise<{ success: boolean; id: string }> {
+  public async deleteZone(
+    @CurrentUser() user: JwtTokenPayload,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; id: string }> {
+    if (user.role !== 'admin') {
+      throw new UnauthorizedException('Administrative privileges required');
+    }
     return await this.detectionService.deleteZone(id);
   }
 }
